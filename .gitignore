@@ -1,0 +1,8 @@
+resourcespace/*
+filestore/*
+*.env.local
+.env
+node_modules/
+dist/
+.DS_Store
+.vscode/settings.json
