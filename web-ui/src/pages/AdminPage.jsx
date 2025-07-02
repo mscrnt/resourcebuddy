@@ -382,6 +382,7 @@ export default function AdminPage() {
                 {[
                   { key: 'enableSearch', label: 'Enable Search' },
                   { key: 'enableCollections', label: 'Enable Collections' },
+                  { key: 'enableCollectionBar', label: 'Enable Collection Bar (Bottom panel for managing collections)' },
                   { key: 'enableSharing', label: 'Enable Sharing' },
                   { key: 'enableDownload', label: 'Enable Download' },
                   { key: 'enableUpload', label: 'Enable Upload' },

@@ -1,22 +1,14 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { Upload } from 'lucide-react'
-import ResourceGrid from '../components/ResourceGrid'
-import ResourceModal from '../components/ResourceModal'
+import ResourceFeed from '../components/ResourceFeed/ResourceFeed'
 import UploadModal from '../components/UploadModal'
-import SortDropdown from '../components/SortDropdown'
 import useAuthStore from '../stores/useAuthStore'
 
 export default function MyUploadsPage() {
   const { user } = useAuthStore()
   const fileInputRef = useRef(null)
-  const [selectedResource, setSelectedResource] = useState(null)
-  const [modalOpen, setModalOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [uploadFiles, setUploadFiles] = useState([])
-  const [resources, setResources] = useState([])
-  const [selectedIndex, setSelectedIndex] = useState(0)
-  const [orderBy, setOrderBy] = useState('modified')
-  const [sort, setSort] = useState('DESC')
 
   // Handle file selection from input
   const handleFileSelect = (e) => {
@@ -38,28 +30,20 @@ export default function MyUploadsPage() {
   }
 
   const handleUploadComplete = () => {
-    // Refresh the grid after upload
+    // Refresh the page after upload
     window.location.reload()
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">My Uploads</h1>
-          <p className="mt-2 text-art-gray-400">
-            Manage your uploaded resources
-          </p>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <SortDropdown 
-            key="sort-dropdown-v2"
-            value={orderBy}
-            sort={sort}
-            onChange={setOrderBy}
-            onSortChange={setSort}
-          />
+    <div className="min-h-screen bg-art-dark">
+      <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">My Uploads</h1>
+            <p className="mt-2 text-art-gray-400">
+              Manage your uploaded resources
+            </p>
+          </div>
           
           <button 
             onClick={handleUploadClick}
@@ -73,50 +57,12 @@ export default function MyUploadsPage() {
       </div>
 
       {user ? (
-        <>
-          <ResourceGrid 
-            searchParams={{
-              search: `!myuploads:${user.username === 'admin' ? '2' : (user.ref || user.id)}`,
-              order_by: orderBy,
-              sort: sort,
-            }}
-            onResourceClick={(resource, allResources, index) => {
-              setSelectedResource(resource)
-              setResources(allResources)
-              setSelectedIndex(index)
-              setModalOpen(true)
-            }}
-            onResourcesLoaded={useCallback((newResources) => {
-              setResources(newResources)
-            }, [])}
-          />
-
-          <ResourceModal
-            resource={selectedResource}
-            isOpen={modalOpen}
-            onClose={() => {
-              setModalOpen(false)
-              setSelectedResource(null)
-            }}
-            onNext={() => {
-              const nextIndex = selectedIndex + 1
-              if (nextIndex < resources.length) {
-                setSelectedIndex(nextIndex)
-                setSelectedResource(resources[nextIndex])
-              }
-            }}
-            onPrevious={() => {
-              const prevIndex = selectedIndex - 1
-              if (prevIndex >= 0) {
-                setSelectedIndex(prevIndex)
-                setSelectedResource(resources[prevIndex])
-              }
-            }}
-            hasNext={selectedIndex < resources.length - 1}
-            hasPrevious={selectedIndex > 0}
-            context="myuploads"
-          />
-        </>
+        <ResourceFeed
+          context="uploads"
+          userFilter={user.username}
+          defaultViewMode="grid"
+          showBreadcrumbs={false}
+        />
       ) : (
         <div className="flex flex-col items-center justify-center py-12">
           <p className="text-art-gray-400">Please log in to view your uploads</p>

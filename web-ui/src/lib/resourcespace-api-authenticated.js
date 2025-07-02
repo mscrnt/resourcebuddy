@@ -45,6 +45,46 @@ const resourceSpaceApiAuthenticated = {
   getSystemStatus: async () => {
     const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
     return resourceSpaceApi.getSystemStatus(sessionKey)
+  },
+
+  getResourceTypes: async () => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.getResourceTypes(sessionKey)
+  },
+
+  getResourceFieldData: async (ref) => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.getResourceFieldData(ref, sessionKey)
+  },
+
+  updateResourceField: async (ref, fieldRef, value) => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.updateResourceField(ref, fieldRef, value, sessionKey)
+  },
+
+  updateResourceType: async (ref, resourceType) => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.updateResourceType(ref, resourceType, sessionKey)
+  },
+
+  getAlternativeFiles: async (ref) => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.getAlternativeFiles(ref, sessionKey)
+  },
+
+  deleteAlternativeFile: async (ref, fileId) => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.deleteAlternativeFile(ref, fileId, sessionKey)
+  },
+
+  checkResourceAccess: async (ref) => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.checkResourceAccess(ref, sessionKey)
+  },
+
+  getRelatedResourcesBackend: async (ref) => {
+    const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    return resourceSpaceApi.getRelatedResourcesBackend(ref, sessionKey)
   }
 }
 

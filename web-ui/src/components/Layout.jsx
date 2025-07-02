@@ -1,8 +1,8 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Upload, Folder, Star, User, Menu, X, LogOut, Settings, MoreVertical, Sun, Moon } from 'lucide-react'
+import { Upload, Folder, Star, User, Menu, X, LogOut, Settings, MoreVertical, Sun, Moon, LayoutDashboard } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '../lib/utils'
-import SearchBar from './SearchBar'
+import HeaderSearchBar from './HeaderSearchBar'
 import useAuthStore from '../stores/useAuthStore'
 import useSettingsStore from '../stores/useSettingsStore'
 // Logo is now in public directory at /logo.png
@@ -11,10 +11,11 @@ import UploadModal from './UploadModal'
 import UserProfileModal from './UserProfileModal'
 
 const navigation = [
-  { name: 'Home', href: '/', icon: null },
-  { name: 'My Uploads', href: '/my-uploads', icon: Upload },
-  { name: 'Collections', href: '/collections', icon: Folder },
-  { name: 'Featured', href: '/featured', icon: Star },
+  { name: 'Browse', href: '/', icon: null, faIcon: 'fa-compass' },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, faIcon: 'fa-th-large' },
+  { name: 'My Uploads', href: '/my-uploads', icon: Upload, faIcon: 'fa-cloud-upload-alt' },
+  { name: 'Collections', href: '/collections', icon: Folder, faIcon: 'fa-folder' },
+  { name: 'Featured', href: '/featured', icon: Star, faIcon: 'fa-star' },
 ]
 
 export default function Layout() {
@@ -43,6 +44,15 @@ export default function Layout() {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark'
     setCurrentTheme(newTheme)
     
+    // Apply theme to UI
+    if (newTheme === 'light') {
+      document.documentElement.classList.remove('dark')
+      document.documentElement.classList.add('light')
+    } else {
+      document.documentElement.classList.remove('light')
+      document.documentElement.classList.add('dark')
+    }
+    
     // Save theme preference to backend
     if (userMetadata?.ref) {
       try {
@@ -61,12 +71,13 @@ export default function Layout() {
         console.error('Failed to save theme preference:', error)
       }
     }
-    
-    // TODO: Apply theme to UI
   }
   
   // Fetch settings on mount
   useEffect(() => {
+    // Set initial theme class
+    document.documentElement.classList.add('dark')
+    
     fetchSettings().then(() => {
       applyTheme()
     })
@@ -93,7 +104,11 @@ export default function Layout() {
               if (metadataData.user.theme_preference) {
                 setCurrentTheme(metadataData.user.theme_preference)
                 if (metadataData.user.theme_preference === 'light' && settings.enableLightTheme !== false) {
-                  // TODO: Apply light theme
+                  document.documentElement.classList.remove('dark')
+                  document.documentElement.classList.add('light')
+                } else {
+                  document.documentElement.classList.remove('light')
+                  document.documentElement.classList.add('dark')
                 }
               }
             }
@@ -139,8 +154,8 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-art-dark">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-art-darker/95 backdrop-blur-sm border-b border-art-gray-800">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-40 bg-art-darker/95 backdrop-blur-sm border-b border-art-gray-800">
+        <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex h-16 items-center justify-between">
             {/* Logo and Desktop Nav */}
             <div className="flex items-center">
@@ -159,20 +174,24 @@ export default function Layout() {
               {/* Desktop Navigation */}
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
                 {navigation.map((item) => {
-                  const isActive = location.pathname === item.href
+                  const isActive = location.pathname === item.href || 
+                    (item.href === '/' && location.pathname === '/')
                   return (
                     <Link
                       key={item.name}
                       to={item.href}
                       className={cn(
-                        'inline-flex items-center px-1 pt-1 text-xl font-medium transition-colors',
+                        'inline-flex items-center px-1 pt-1 text-xl font-medium transition-colors relative',
                         isActive
-                          ? 'text-white border-b-2 border-art-accent'
+                          ? 'text-white'
                           : 'text-art-gray-400 hover:text-white'
                       )}
                     >
-                      {item.icon && <item.icon className="mr-2 h-6 w-6" />}
+                      {item.faIcon && <i className={`fas ${item.faIcon} mr-2 text-lg`} />}
                       {item.name}
+                      {isActive && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-art-accent transition-all duration-300" />
+                      )}
                     </Link>
                   )
                 })}
@@ -181,7 +200,7 @@ export default function Layout() {
 
             {/* Search and User Menu */}
             <div className="flex items-center gap-4">
-              <SearchBar />
+              <HeaderSearchBar />
               
               {/* Theme Toggle */}
               {settings.enableLightTheme !== false && (
@@ -283,7 +302,8 @@ export default function Layout() {
           <nav className="md:hidden bg-art-darker border-t border-art-gray-800">
             <div className="space-y-1 px-2 pb-3 pt-2">
               {navigation.map((item) => {
-                const isActive = location.pathname === item.href
+                const isActive = location.pathname === item.href || 
+                  (item.href === '/' && location.pathname === '/')
                 return (
                   <Link
                     key={item.name}
@@ -292,12 +312,12 @@ export default function Layout() {
                     className={cn(
                       'block rounded-md px-3 py-2 text-lg font-medium transition-colors',
                       isActive
-                        ? 'bg-art-gray-800 text-white'
+                        ? 'bg-art-accent text-white'
                         : 'text-art-gray-400 hover:bg-art-gray-800 hover:text-white'
                     )}
                   >
                     <span className="flex items-center">
-                      {item.icon && <item.icon className="mr-3 h-6 w-6" />}
+                      {item.faIcon && <i className={`fas ${item.faIcon} mr-3 text-xl`} />}
                       {item.name}
                     </span>
                   </Link>
@@ -315,7 +335,7 @@ export default function Layout() {
 
       {/* Footer */}
       <footer className="bg-art-darker border-t border-art-gray-800 mt-auto">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto px-6 py-6 sm:px-8 lg:px-12 xl:px-16">
           <p className="text-center text-sm text-art-gray-500">
             Powered by ResourceSpace
           </p>

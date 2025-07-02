@@ -7,7 +7,12 @@ const multer = require('multer');
 const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
-const { getSettings, updateSettings, getSetting, setSetting, getUserProfile, createOrUpdateUserProfile, updateUserTheme } = require('./database');
+const { 
+  getSettings, updateSettings, getSetting, setSetting, 
+  getUserProfile, createOrUpdateUserProfile, updateUserTheme,
+  getUserDashboardTiles, getDashboardTile, createDashboardTile,
+  updateDashboardTile, deleteDashboardTile, updateTilePositions
+} = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -335,6 +340,66 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+// Preview endpoint - proxies preview images from ResourceSpace
+app.get('/api/resource/:ref/preview', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { size = 'thm' } = req.query;
+    
+    console.log(`Fetching preview for resource ${ref}, size: ${size}`);
+    
+    // Get the resource path from ResourceSpace
+    const params = {
+      user: RS_USER,
+      function: 'get_resource_path',
+      param1: ref,        // resource ID
+      param2: '',         // not_used
+      param3: size,       // size code (thm, pre, scr, etc)
+      param4: 1,          // generate if not exists
+      param5: 'jpg',      // extension
+      param6: 1,          // page
+      param7: 0,          // watermarked
+      param8: -1          // alternative (-1 = original)
+    };
+    
+    const queryString = Object.entries(params)
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&');
+    
+    const signature = signRequest(queryString);
+    const apiUrl = `${RS_API_URL}?${queryString}&sign=${signature}`;
+    
+    const response = await axios.get(apiUrl);
+    
+    if (response.data && typeof response.data === 'string' && response.data.startsWith('http')) {
+      // Got a URL, fetch the image
+      const imageResponse = await axios.get(response.data, {
+        responseType: 'stream'
+      });
+      
+      // Set appropriate headers
+      res.set('Content-Type', imageResponse.headers['content-type'] || 'image/jpeg');
+      res.set('Cache-Control', 'public, max-age=3600');
+      
+      // Stream the image to the client
+      imageResponse.data.pipe(res);
+    } else {
+      console.error('Invalid preview URL response:', response.data);
+      res.status(404).json({
+        success: false,
+        error: 'Preview not found'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Preview fetch error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch preview'
+    });
+  }
+});
+
 // Settings management endpoints
 
 // Get all settings
@@ -525,6 +590,689 @@ app.post('/api/user-profile/:ref/picture', profilePicUpload.single('picture'), a
   } catch (error) {
     console.error('Error uploading profile picture:', error);
     res.status(500).json({ success: false, error: 'Failed to upload profile picture' });
+  }
+});
+
+// Dashboard Tiles API endpoints
+// Get all tiles for a user
+app.get('/api/dashboard/tiles/:userRef', async (req, res) => {
+  try {
+    const { userRef } = req.params;
+    const tiles = getUserDashboardTiles(parseInt(userRef));
+    
+    res.json({
+      success: true,
+      tiles
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard tiles:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch dashboard tiles' });
+  }
+});
+
+// Get single tile
+app.get('/api/dashboard/tiles/:userRef/:tileId', async (req, res) => {
+  try {
+    const { userRef, tileId } = req.params;
+    const tile = getDashboardTile(parseInt(tileId), parseInt(userRef));
+    
+    if (!tile) {
+      return res.status(404).json({ success: false, error: 'Tile not found' });
+    }
+    
+    res.json({
+      success: true,
+      tile
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard tile:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch dashboard tile' });
+  }
+});
+
+// Create new tile
+app.post('/api/dashboard/tiles/:userRef', async (req, res) => {
+  try {
+    const { userRef } = req.params;
+    const tileData = req.body;
+    
+    const tileId = createDashboardTile(parseInt(userRef), tileData);
+    const tile = getDashboardTile(tileId, parseInt(userRef));
+    
+    res.json({
+      success: true,
+      tile
+    });
+  } catch (error) {
+    console.error('Error creating dashboard tile:', error);
+    res.status(500).json({ success: false, error: 'Failed to create dashboard tile' });
+  }
+});
+
+// Update tile
+app.put('/api/dashboard/tiles/:userRef/:tileId', async (req, res) => {
+  try {
+    const { userRef, tileId } = req.params;
+    const tileData = req.body;
+    
+    updateDashboardTile(parseInt(tileId), parseInt(userRef), tileData);
+    const tile = getDashboardTile(parseInt(tileId), parseInt(userRef));
+    
+    res.json({
+      success: true,
+      tile
+    });
+  } catch (error) {
+    console.error('Error updating dashboard tile:', error);
+    res.status(500).json({ success: false, error: 'Failed to update dashboard tile' });
+  }
+});
+
+// Delete tile
+app.delete('/api/dashboard/tiles/:userRef/:tileId', async (req, res) => {
+  try {
+    const { userRef, tileId } = req.params;
+    
+    deleteDashboardTile(parseInt(tileId), parseInt(userRef));
+    
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error('Error deleting dashboard tile:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete dashboard tile' });
+  }
+});
+
+// Update tile positions
+app.post('/api/dashboard/tiles/:userRef/positions', async (req, res) => {
+  try {
+    const { userRef } = req.params;
+    const { positions } = req.body;
+    
+    updateTilePositions(parseInt(userRef), positions);
+    
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error('Error updating tile positions:', error);
+    res.status(500).json({ success: false, error: 'Failed to update tile positions' });
+  }
+});
+
+// Execute saved search for tile
+app.post('/api/dashboard/tiles/execute-search', async (req, res) => {
+  try {
+    const { searchParams, sessionKey } = req.body;
+    
+    // Build ResourceSpace search query
+    const params = new URLSearchParams({
+      function: 'do_search',
+      param1: searchParams.search || '',
+      param2: searchParams.restypes || '',
+      param3: searchParams.order_by || 'relevance',
+      param4: searchParams.archive || '0',
+      param5: searchParams.fetchrows || '8',
+      param6: searchParams.sort || 'DESC',
+      param7: searchParams.recent_search_daylimit || '',
+      param8: searchParams.go || ''
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json({
+      success: true,
+      results: response.data,
+      count: Array.isArray(response.data) ? response.data.length : 0
+    });
+  } catch (error) {
+    console.error('Error executing search:', error);
+    res.status(500).json({ success: false, error: 'Failed to execute search' });
+  }
+});
+
+// Collection Management endpoints
+// Add resource to collection
+app.post('/api/collections/:collectionId/resources/:resourceId', async (req, res) => {
+  try {
+    const { collectionId, resourceId } = req.params;
+    const { sessionKey } = req.body;
+    
+    // Build ResourceSpace API query
+    const params = new URLSearchParams({
+      function: 'add_resource_to_collection',
+      param1: resourceId,
+      param2: collectionId
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json({
+      success: response.data === true,
+      message: response.data === true ? 'Resource added to collection' : 'Failed to add resource'
+    });
+  } catch (error) {
+    console.error('Error adding resource to collection:', error);
+    res.status(500).json({ success: false, error: 'Failed to add resource to collection' });
+  }
+});
+
+// Remove resource from collection
+app.delete('/api/collections/:collectionId/resources/:resourceId', async (req, res) => {
+  try {
+    const { collectionId, resourceId } = req.params;
+    const { sessionKey } = req.query;
+    
+    // Build ResourceSpace API query
+    const params = new URLSearchParams({
+      function: 'remove_resource_from_collection',
+      param1: resourceId,
+      param2: collectionId
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json({
+      success: response.data === true,
+      message: response.data === true ? 'Resource removed from collection' : 'Failed to remove resource'
+    });
+  } catch (error) {
+    console.error('Error removing resource from collection:', error);
+    res.status(500).json({ success: false, error: 'Failed to remove resource from collection' });
+  }
+});
+
+// Add multiple resources to collection
+app.post('/api/collections/:collectionId/resources/batch', async (req, res) => {
+  try {
+    const { collectionId } = req.params;
+    const { resourceIds, sessionKey } = req.body;
+    
+    const results = await Promise.all(resourceIds.map(async (resourceId) => {
+      const params = new URLSearchParams({
+        function: 'add_resource_to_collection',
+        param1: resourceId,
+        param2: collectionId
+      });
+      
+      const query = `user=${RS_USER}&${params.toString()}`;
+      const sign = signRequest(query);
+      
+      try {
+        const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+          headers: {
+            'Cookie': `rs_session=${sessionKey}`
+          }
+        });
+        return { resourceId, success: response.data === true };
+      } catch (err) {
+        return { resourceId, success: false };
+      }
+    }));
+    
+    const successCount = results.filter(r => r.success).length;
+    
+    res.json({
+      success: successCount > 0,
+      results,
+      message: `Added ${successCount} of ${resourceIds.length} resources to collection`
+    });
+  } catch (error) {
+    console.error('Error adding resources to collection:', error);
+    res.status(500).json({ success: false, error: 'Failed to add resources to collection' });
+  }
+});
+
+// Resource Modal Enhancement endpoints
+
+// Get resource field data (detailed metadata)
+app.post('/api/resource/:ref/field-data', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { sessionKey } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'get_resource_field_data',
+      param1: ref,
+      param2: 'false' // Don't use permissions
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error getting resource field data:', error);
+    res.status(500).json({ success: false, error: 'Failed to get field data' });
+  }
+});
+
+// Update resource field
+app.post('/api/resource/:ref/field/:fieldRef', async (req, res) => {
+  try {
+    const { ref, fieldRef } = req.params;
+    const { value, sessionKey } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'update_field',
+      param1: ref,
+      param2: fieldRef,
+      param3: value || ''
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json({
+      success: response.data === true || response.data === 'true',
+      message: 'Field updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating resource field:', error);
+    res.status(500).json({ success: false, error: 'Failed to update field' });
+  }
+});
+
+// Update resource type
+app.post('/api/resource/:ref/type', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { resource_type, sessionKey } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'update_resource_type',
+      param1: ref,
+      param2: resource_type
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json({
+      success: response.data === true || response.data === 'true',
+      message: 'Resource type updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating resource type:', error);
+    res.status(500).json({ success: false, error: 'Failed to update resource type' });
+  }
+});
+
+// Get alternative files
+app.post('/api/resource/:ref/alternative-files', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { sessionKey } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'get_alternative_files',
+      param1: ref
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json(response.data || []);
+  } catch (error) {
+    console.error('Error getting alternative files:', error);
+    res.status(500).json({ success: false, error: 'Failed to get alternative files' });
+  }
+});
+
+// Delete alternative file
+app.delete('/api/resource/:ref/alternative-file/:fileId', async (req, res) => {
+  try {
+    const { ref, fileId } = req.params;
+    const { sessionKey } = req.query;
+    
+    const params = new URLSearchParams({
+      function: 'delete_alternative_file',
+      param1: ref,
+      param2: fileId
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json({
+      success: response.data === true || response.data === 'true',
+      message: 'Alternative file deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting alternative file:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete alternative file' });
+  }
+});
+
+// Check resource access
+app.post('/api/resource/:ref/access', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { sessionKey } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'get_resource_access',
+      param1: ref
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    // Parse access level
+    const accessLevel = parseInt(response.data) || 0;
+    
+    res.json({
+      access: accessLevel,
+      view: accessLevel >= 0,
+      edit: accessLevel >= 1,
+      download: accessLevel >= 0,
+      comment: accessLevel >= 0
+    });
+  } catch (error) {
+    console.error('Error checking resource access:', error);
+    res.status(500).json({ success: false, error: 'Failed to check access' });
+  }
+});
+
+// Configure multer for resource file uploads
+const resourceUploadStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, 'uploads/temp');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const resourceUpload = multer({ 
+  storage: resourceUploadStorage,
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB
+});
+
+// Upload file (for thumbnails and variants)
+app.post('/api/resource/:ref/upload', resourceUpload.single('file'), async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { sessionKey, previewonly, alternative } = req.body;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    
+    // Create form data for ResourceSpace
+    const formData = new FormData();
+    formData.append('userfile', fs.createReadStream(file.path), file.originalname);
+    
+    // Build query parameters
+    const params = new URLSearchParams({
+      function: 'upload_file',
+      param1: ref,
+      param2: 'true', // no_exif
+      param3: 'false', // revert
+      param4: 'false' // autorotate
+    });
+    
+    if (previewonly === 'true') {
+      params.append('param5', 'true'); // preview_only
+    }
+    
+    if (alternative) {
+      params.append('param6', alternative); // alternative file name
+    }
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.post(
+      `${RS_API_URL}?${query}&sign=${sign}`,
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders(),
+          'Cookie': `rs_session=${sessionKey}`
+        }
+      }
+    );
+    
+    // Clean up temp file
+    fs.unlinkSync(file.path);
+    
+    res.json({
+      success: response.data === true || response.data === 'true',
+      message: previewonly === 'true' ? 'Thumbnail uploaded successfully' : 'File uploaded successfully'
+    });
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    // Clean up temp file on error
+    if (req.file) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ success: false, error: 'Failed to upload file' });
+  }
+});
+
+// Get related resources
+app.post('/api/resource/:ref/related', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { sessionKey } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'get_related_resources',
+      param1: ref
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json(response.data || []);
+  } catch (error) {
+    console.error('Error getting related resources:', error);
+    res.status(500).json({ success: false, error: 'Failed to get related resources' });
+  }
+});
+
+// Create new collection
+app.post('/api/collections/create', async (req, res) => {
+  try {
+    const { name, type = 0, public: isPublic = 0, sessionKey } = req.body;
+    
+    // First create a new empty collection
+    const createParams = new URLSearchParams({
+      function: 'create_collection',
+      param1: name
+    });
+    
+    const createQuery = `user=${RS_USER}&${createParams.toString()}`;
+    const createSign = signRequest(createQuery);
+    
+    const createResponse = await axios.get(`${RS_API_URL}?${createQuery}&sign=${createSign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    const collectionRef = createResponse.data;
+    
+    if (collectionRef) {
+      // Save collection data
+      const saveParams = new URLSearchParams({
+        function: 'save_collection',
+        param1: collectionRef,
+        param2: JSON.stringify({
+          name: name,
+          type: type,
+          public: isPublic
+        })
+      });
+      
+      const saveQuery = `user=${RS_USER}&${saveParams.toString()}`;
+      const saveSign = signRequest(saveQuery);
+      
+      await axios.get(`${RS_API_URL}?${saveQuery}&sign=${saveSign}`, {
+        headers: {
+          'Cookie': `rs_session=${sessionKey}`
+        }
+      });
+      
+      res.json({
+        success: true,
+        collection: { ref: collectionRef, name: name }
+      });
+    } else {
+      res.json({ success: false, error: 'Failed to create collection' });
+    }
+  } catch (error) {
+    console.error('Error creating collection:', error);
+    res.status(500).json({ success: false, error: 'Failed to create collection' });
+  }
+});
+
+// Delete collection
+app.delete('/api/collections/:collectionId', async (req, res) => {
+  try {
+    const { collectionId } = req.params;
+    const { sessionKey } = req.query;
+    
+    const params = new URLSearchParams({
+      function: 'delete_collection',
+      param1: collectionId
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json({
+      success: response.data === true || response.data === 'true'
+    });
+  } catch (error) {
+    console.error('Error deleting collection:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete collection' });
+  }
+});
+
+// Get user collections
+app.post('/api/collections/user', async (req, res) => {
+  try {
+    const { sessionKey } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'get_user_collections'
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json(response.data || []);
+  } catch (error) {
+    console.error('Error getting user collections:', error);
+    res.status(500).json({ success: false, error: 'Failed to get user collections' });
+  }
+});
+
+// Get featured collections
+app.post('/api/collections/featured', async (req, res) => {
+  try {
+    const { sessionKey, parent = 0 } = req.body;
+    
+    const params = new URLSearchParams({
+      function: 'get_featured_collections',
+      param1: parent
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`, {
+      headers: {
+        'Cookie': `rs_session=${sessionKey}`
+      }
+    });
+    
+    res.json(response.data || []);
+  } catch (error) {
+    console.error('Error getting featured collections:', error);
+    res.status(500).json({ success: false, error: 'Failed to get featured collections' });
   }
 });
 

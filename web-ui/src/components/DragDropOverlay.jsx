@@ -13,8 +13,20 @@ export default function DragDropOverlay({ onDrop }) {
       
       dragCounter.current++
       
+      // Only activate for file drops, not internal element drags
       if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-        setIsDragging(true)
+        // Check if this is a file drag by looking for file types
+        const hasFiles = Array.from(e.dataTransfer.items).some(item => item.kind === 'file')
+        
+        // Also check if it's not an internal drag (no resourceRef data)
+        const isInternalDrag = e.dataTransfer.types.includes('resourceref') || 
+                              e.dataTransfer.types.includes('resourcedata') ||
+                              e.dataTransfer.types.includes('multipleresources') ||
+                              e.dataTransfer.types.includes('text/plain')
+        
+        if (hasFiles && !isInternalDrag) {
+          setIsDragging(true)
+        }
       }
     }
 

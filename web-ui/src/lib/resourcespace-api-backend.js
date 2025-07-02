@@ -99,17 +99,29 @@ export const resourceSpaceApi = {
 
   // Get user collections
   getUserCollections: async (sessionKey = null) => {
-    return resourceSpaceApi.apiCall('get_user_collections', {
-      param1: API_USER
-    }, sessionKey)
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/collections/user`, {
+        sessionKey
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user collections:', error);
+      throw error;
+    }
   },
 
   // Get featured collections
   getFeaturedCollections: async (sessionKey = null) => {
-    return resourceSpaceApi.apiCall('get_featured_collections', {
-      param1: 0, // parent
-      param2: 'themearray' // context
-    }, sessionKey)
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/collections/featured`, {
+        sessionKey,
+        parent: 0 // Root level
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching featured collections:', error);
+      throw error;
+    }
   },
 
   // Get collection resources
@@ -276,9 +288,107 @@ export const resourceSpaceApi = {
   // Get all resource types
   getResourceTypes: async (sessionKey = null) => {
     return resourceSpaceApi.apiCall('get_resource_types', {}, sessionKey)
+  },
+
+  // Get detailed resource field data
+  getResourceFieldData: async (ref, sessionKey) => {
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/resource/${ref}/field-data`, {
+        sessionKey
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching resource field data:', error);
+      throw error;
+    }
+  },
+
+  // Update resource field
+  updateResourceField: async (ref, fieldRef, value, sessionKey) => {
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/resource/${ref}/field/${fieldRef}`, {
+        value,
+        sessionKey
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating resource field:', error);
+      throw error;
+    }
+  },
+
+  // Update resource type
+  updateResourceType: async (ref, resourceType, sessionKey) => {
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/resource/${ref}/type`, {
+        resource_type: resourceType,
+        sessionKey
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating resource type:', error);
+      throw error;
+    }
+  },
+
+  // Get alternative files
+  getAlternativeFiles: async (ref, sessionKey) => {
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/resource/${ref}/alternative-files`, {
+        sessionKey
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting alternative files:', error);
+      throw error;
+    }
+  },
+
+  // Delete alternative file
+  deleteAlternativeFile: async (ref, fileId, sessionKey) => {
+    try {
+      const response = await axios.delete(
+        `${BACKEND_URL}/api/resource/${ref}/alternative-file/${fileId}?sessionKey=${sessionKey}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting alternative file:', error);
+      throw error;
+    }
+  },
+
+  // Check resource access
+  checkResourceAccess: async (ref, sessionKey) => {
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/resource/${ref}/access`, {
+        sessionKey
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error checking resource access:', error);
+      throw error;
+    }
+  },
+
+  // Get related resources via backend
+  getRelatedResourcesBackend: async (ref, sessionKey) => {
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/resource/${ref}/related`, {
+        sessionKey
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting related resources:', error);
+      throw error;
+    }
   }
 }
 
 const API_USER = import.meta.env.VITE_RS_USER
+
+// Helper function to get preview URL directly from backend
+export const getResourcePreviewUrl = (ref, size = 'thm') => {
+  return `${BACKEND_URL}/api/resource/${ref}/preview?size=${size}`
+}
 
 export default resourceSpaceApi
