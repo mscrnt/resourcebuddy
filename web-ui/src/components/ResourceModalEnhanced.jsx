@@ -32,9 +32,10 @@ export default function ResourceModalEnhanced({
   const [error, setError] = useState(null)
   const [mediaUrl, setMediaUrl] = useState(null)
   const [relatedResources, setRelatedResources] = useState([])
-  const [showMetadata, setShowMetadata] = useState(true)
+  const [showMetadata, setShowMetadata] = useState(false)
   const [metadataCollapsed, setMetadataCollapsed] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [metadataAnimating, setMetadataAnimating] = useState(false)
   const [metadata, setMetadata] = useState(null)
   const [editingField, setEditingField] = useState(null)
   const [editValues, setEditValues] = useState({})
@@ -50,6 +51,8 @@ export default function ResourceModalEnhanced({
   const [isInCollection, setIsInCollection] = useState(false)
   const [metadataWidth, setMetadataWidth] = useState(320)
   const [isResizingMetadata, setIsResizingMetadata] = useState(false)
+  const MIN_METADATA_WIDTH = 280
+  const MAX_METADATA_WIDTH = 600
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
   const [availableSpace, setAvailableSpace] = useState({ width: 0, height: 0 })
   const [resourceData, setResourceData] = useState(null)
@@ -495,7 +498,7 @@ export default function ResourceModalEnhanced({
   const handleMetadataResize = useCallback((e) => {
     if (!isResizingMetadata) return
     
-    const newWidth = Math.max(280, Math.min(600, window.innerWidth - e.clientX))
+    const newWidth = Math.max(MIN_METADATA_WIDTH, Math.min(MAX_METADATA_WIDTH, window.innerWidth - e.clientX))
     setMetadataWidth(newWidth)
   }, [isResizingMetadata])
 
@@ -544,6 +547,7 @@ export default function ResourceModalEnhanced({
         case 'i':
         case 'I':
           if (!e.target.closest('input, textarea')) {
+            e.preventDefault()
             setShowMetadata(!showMetadata)
           }
           break
@@ -569,7 +573,12 @@ export default function ResourceModalEnhanced({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={(e) => {
+          // Only close if clicking the backdrop, not the content
+          if (e.target === e.currentTarget) {
+            onClose()
+          }
+        }}
       >
         <div className={cn(
           "relative h-full w-full flex",
@@ -582,8 +591,8 @@ export default function ResourceModalEnhanced({
                 initial={{ x: -metadataWidth }}
                 animate={{ x: 0 }}
                 exit={{ x: -metadataWidth }}
-                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="relative bg-art-gray-900 border-r border-art-gray-800 overflow-y-auto flex-shrink-0"
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="relative bg-art-gray-900/95 backdrop-blur-sm border-r border-art-gray-800 overflow-y-auto flex-shrink-0 shadow-2xl"
                 style={{ 
                   width: `${metadataWidth}px`,
                   height: activeCollection ? `calc(100vh - ${collectionBarHeight || 52}px)` : '100vh'
@@ -596,12 +605,21 @@ export default function ResourceModalEnhanced({
                   onMouseDown={() => setIsResizingMetadata(true)}
                 />
 
+                {/* Close button inside panel */}
+                <button
+                  onClick={() => setShowMetadata(false)}
+                  className="absolute top-4 right-4 z-10 p-1.5 rounded-md bg-art-gray-800 hover:bg-art-gray-700 text-white transition-all"
+                  title="Close metadata panel (I)"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+
                 <div className={cn(
-                  "p-4 space-y-4 h-full overflow-y-auto",
-                  metadataWidth > 400 ? "p-6 space-y-6" : "p-4 space-y-4"
+                  "pt-12 px-4 pb-4 h-full overflow-y-auto",
+                  metadataWidth > 400 ? "px-6" : "px-4"
                 )}>
                   {/* Resource Type */}
-                  <div>
+                  <div className="mb-6">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="text-sm font-semibold text-art-gray-400 uppercase">Resource Type</h3>
                         {permissions.edit && (
@@ -616,7 +634,7 @@ export default function ResourceModalEnhanced({
                       {editingResourceType ? (
                         <div className="space-y-2">
                           <select
-                            value={resource.resource_type}
+                            value={resourceData?.resource_type || resource.resource_type}
                             onChange={(e) => updateResourceType(e.target.value)}
                             className="w-full px-3 py-2 bg-art-gray-800 border border-art-gray-700 rounded text-white"
                             disabled={saving}
@@ -628,28 +646,40 @@ export default function ResourceModalEnhanced({
                         </div>
                       ) : (
                         <p className="text-white">
-                          {resourceTypes.find(t => t.ref === resource.resource_type)?.name || 'Unknown'}
+                          {resourceTypes.find(t => t.ref == (resourceData?.resource_type || resource.resource_type))?.name || 'Unknown'}
                         </p>
                       )}
                     </div>
 
-                    {/* Metadata Fields */}
-                    {metadata && (
-                      <div className="space-y-4">
-                        <h3 className="text-sm font-semibold text-art-gray-400 uppercase">Metadata</h3>
-                        {metadata.map(field => (
-                          <div key={field.ref}>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="text-sm text-art-gray-400">{field.title}</label>
-                              {permissions.edit && field.editable && (
-                                <button
-                                  onClick={() => setEditingField(field.ref)}
-                                  className="p-1 rounded hover:bg-art-gray-800"
-                                >
-                                  <Edit2 className="h-3 w-3 text-art-gray-400" />
-                                </button>
-                              )}
-                            </div>
+                    {/* Metadata Sections */}
+                    {metadata && organizeMetadataIntoSections(metadata).map((section, index) => (
+                      <div key={section.key} className={cn(
+                        "pb-6",
+                        index !== organizeMetadataIntoSections(metadata).length - 1 && "border-b border-art-gray-800"
+                      )}>
+                        <h3 className="text-sm font-semibold text-art-gray-400 uppercase mb-4 tracking-wider">{section.title}</h3>
+                        <div className={cn(
+                          "grid gap-3",
+                          metadataWidth > 400 ? "grid-cols-2" : "grid-cols-1"
+                        )}>
+                          {section.fields.map(field => (
+                            <div key={field.ref} className={cn(
+                              "col-span-1",
+                              // Make some fields span full width
+                              (field.type === 'largetextarea' || field.name?.toLowerCase().includes('description')) && "md:col-span-2"
+                            )}>
+                              <div className="group">
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-xs font-medium text-art-gray-400 uppercase tracking-wider">{field.title}</label>
+                                  {permissions.edit && field.editable && (
+                                    <button
+                                      onClick={() => setEditingField(field.ref)}
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-art-gray-800 transition-opacity"
+                                    >
+                                      <Edit2 className="h-3 w-3 text-art-gray-400" />
+                                    </button>
+                                  )}
+                                </div>
                             {editingField === field.ref ? (
                               <div className="flex gap-1">
                                 <input
@@ -685,10 +715,12 @@ export default function ResourceModalEnhanced({
                                 {field.value || '-'}
                               </p>
                             )}
-                          </div>
-                        ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    )}
+                    ))}
 
                     {/* Custom Thumbnail Upload */}
                     {permissions.edit && (
@@ -813,6 +845,7 @@ export default function ResourceModalEnhanced({
             )}
           </AnimatePresence>
 
+
           {/* Main Content Area */}
           <div className={cn(
             "flex-1 relative",
@@ -822,9 +855,30 @@ export default function ResourceModalEnhanced({
             {!isImageFullscreen && (
               <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/90 to-transparent" style={{ height: '45px' }}>
               <div className="flex items-center justify-between h-full px-3">
-                <h2 className="text-base font-medium text-white truncate max-w-2xl">
-                  {resource.field8 || `Resource ${resource.ref}`}
-                </h2>
+                <div className="flex items-center space-x-2">
+                  <AnimatePresence mode="wait">
+                    {!showMetadata && (
+                      <motion.button
+                        key="info-button"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMetadata(true);
+                        }}
+                        className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
+                        title="Show metadata panel (I)"
+                      >
+                        <Info className="h-4 w-4" />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                  <h2 className="text-base font-medium text-white truncate max-w-2xl">
+                    {resource.field8 || `Resource ${resource.ref}`}
+                  </h2>
+                </div>
                 <div className="flex items-center space-x-2">
                   {activeCollection && (
                     <button
@@ -846,13 +900,6 @@ export default function ResourceModalEnhanced({
                     title="Share"
                   >
                     <Share2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setShowMetadata(!showMetadata)}
-                    className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
-                    title="Toggle metadata (I)"
-                  >
-                    <Info className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setIsImageFullscreen(!isImageFullscreen)}
@@ -1012,6 +1059,79 @@ export default function ResourceModalEnhanced({
       </motion.div>
     </AnimatePresence>
   )
+}
+
+// Helper function to organize metadata into sections
+function organizeMetadataIntoSections(metadata) {
+  if (!metadata || !Array.isArray(metadata)) return []
+
+  const sections = {
+    general: {
+      title: 'General Info',
+      fields: [],
+      order: 1,
+      fieldNames: ['title', 'caption', 'description', 'date', 'country', 'credit']
+    },
+    media: {
+      title: 'Media Info',
+      fields: [],
+      order: 2,
+      fieldNames: ['camera', 'model', 'lens', 'filename', 'filetype', 'originalfilename', 'filesize', 'dimensions', 'resolution', 'pixelwidth', 'pixelheight']
+    },
+    keywords: {
+      title: 'Keywords & Tags',
+      fields: [],
+      order: 3,
+      fieldNames: ['keywords', 'tags', 'subject', 'category']
+    },
+    people: {
+      title: 'People',
+      fields: [],
+      order: 4,
+      fieldNames: ['person', 'people', 'namedpersons', 'actors', 'creator', 'contributor']
+    },
+    administrative: {
+      title: 'Administrative',
+      fields: [],
+      order: 5,
+      fieldNames: ['notes', 'source', 'copyright', 'intellectual', 'restrictions', 'contactemail']
+    }
+  }
+
+  // Categorize fields
+  metadata.forEach(field => {
+    // Only include fields with display_field === true
+    if (field.display_field === false) return
+    
+    // Skip empty values unless they're editable
+    if (!field.value && !field.editable) return
+
+    const fieldNameLower = field.name?.toLowerCase() || ''
+    let categorized = false
+
+    // Try to categorize based on field name
+    for (const [sectionKey, section] of Object.entries(sections)) {
+      if (section.fieldNames.some(name => fieldNameLower.includes(name))) {
+        section.fields.push(field)
+        categorized = true
+        break
+      }
+    }
+
+    // If not categorized, add to general
+    if (!categorized) {
+      sections.general.fields.push(field)
+    }
+  })
+
+  // Convert to array and filter out empty sections
+  return Object.entries(sections)
+    .map(([key, section]) => ({
+      key,
+      ...section
+    }))
+    .filter(section => section.fields.length > 0)
+    .sort((a, b) => a.order - b.order)
 }
 
 // Helper function to determine media type
