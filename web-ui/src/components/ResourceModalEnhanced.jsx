@@ -5,7 +5,7 @@ import { cn } from '../lib/utils'
 import { useApi } from '../contexts/ApiContext'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
-import VideoPlayer from './VideoPlayer'
+import VideoPlayerPro from './VideoPlayerPro'
 import ImageViewer from './ImageViewer'
 import axios from 'axios'
 
@@ -51,11 +51,14 @@ export default function ResourceModalEnhanced({
   const [metadataWidth, setMetadataWidth] = useState(320)
   const [isResizingMetadata, setIsResizingMetadata] = useState(false)
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
+  const [availableSpace, setAvailableSpace] = useState({ width: 0, height: 0 })
+  const [resourceData, setResourceData] = useState(null)
   
   const modalRef = useRef(null)
   const fileInputRef = useRef(null)
   const variantInputRef = useRef(null)
-  const mediaType = getMediaType(resource)
+  const mediaContainerRef = useRef(null)
+  const mediaType = getMediaType(resourceData || resource)
 
   // Load metadata collapsed state from localStorage
   useEffect(() => {
@@ -64,6 +67,25 @@ export default function ResourceModalEnhanced({
       setMetadataCollapsed(JSON.parse(savedState))
     }
   }, [])
+
+  // Calculate available space for media
+  useEffect(() => {
+    const calculateSpace = () => {
+      if (!mediaContainerRef.current) return
+      
+      const collectionBarHeight = activeCollection && !isImageFullscreen ? 176 : 0
+      const metadataPanelWidth = showMetadata && !isImageFullscreen ? metadataWidth : 0
+      
+      setAvailableSpace({
+        width: window.innerWidth - metadataPanelWidth,
+        height: window.innerHeight - collectionBarHeight
+      })
+    }
+
+    calculateSpace()
+    window.addEventListener('resize', calculateSpace)
+    return () => window.removeEventListener('resize', calculateSpace)
+  }, [showMetadata, metadataWidth, activeCollection, isImageFullscreen])
 
   // Save metadata collapsed state to localStorage
   useEffect(() => {
@@ -93,9 +115,13 @@ export default function ResourceModalEnhanced({
     setLoading(true)
     setError(null)
     try {
-      // Load all data in parallel
+      // First load the resource data to get the correct type and extension
+      const data = await api.getResource(resource.ref, sessionKey)
+      setResourceData(data)
+      
+      // Load all other data in parallel
       await Promise.all([
-        loadMedia(),
+        loadMedia(data),
         loadMetadata(),
         loadRelatedResources(),
         loadAlternativeFiles(),
@@ -112,11 +138,23 @@ export default function ResourceModalEnhanced({
     }
   }
 
-  const loadMedia = async () => {
+  const loadMedia = async (resourceInfo = null) => {
     try {
-      const size = mediaType === 'video' ? '' : 'scr'
-      const url = await api.getResourcePath(resource.ref, size)
-      setMediaUrl(url)
+      const resData = resourceInfo || resourceData || resource
+      const resType = getMediaType(resData)
+      
+      if (resType === 'video') {
+        // For videos, we need to get the actual video file URL, not a preview
+        // Use empty size parameter to get the original file
+        // Try to get extension from various possible fields
+        const extension = resData.file_extension || resData.fileextension || resData.field53 || 'mp4'
+        const url = await api.getResourcePath(resData.ref, '', true, extension)
+        setMediaUrl(url)
+      } else {
+        // For images, get the screen size preview
+        const url = await api.getResourcePath(resData.ref, 'scr')
+        setMediaUrl(url)
+      }
     } catch (err) {
       console.error('Failed to load media:', err)
       throw err
@@ -863,14 +901,16 @@ export default function ResourceModalEnhanced({
             )}
 
             {/* Media Container */}
-            <div className={cn(
-              "h-full flex items-center justify-center",
-              !isImageFullscreen && "p-4",
-              activeCollection && !isImageFullscreen && "pb-44" // Account for collection bar
-            )}>
+            <div 
+              ref={mediaContainerRef}
+              className={cn(
+                "h-full flex items-center justify-center",
+                activeCollection && !isImageFullscreen && "pb-44" // Account for collection bar
+              )}
+            >
               <div className={cn(
-                "relative max-w-full max-h-full",
-                isImageFullscreen ? "w-full h-full" : isFullscreen ? "w-full h-full" : "w-[90%] h-[90%]"
+                "relative w-full h-full flex items-center justify-center",
+                isImageFullscreen && "w-full h-full"
               )}>
                 {loading && (
                   <div className="flex items-center justify-center h-full">
@@ -886,21 +926,31 @@ export default function ResourceModalEnhanced({
                 )}
                 
                 {!loading && !error && mediaUrl && (
-                  <>
+                  <div className="w-full h-full flex items-center justify-center">
                     {mediaType === 'video' ? (
-                      <VideoPlayer
-                        src={mediaUrl}
-                        resource={resource}
-                        isFullscreen={isFullscreen}
-                      />
+                      <div className="w-full h-full max-w-full max-h-full">
+                        <VideoPlayerPro
+                          src={mediaUrl}
+                          poster={null} // Could add poster URL if available
+                          title={(resourceData || resource).field8 || `Resource ${resource.ref}`}
+                          resource={resourceData || resource}
+                          isFullscreen={isImageFullscreen}
+                          onError={(err) => {
+                            console.error('Video player error:', err)
+                            setError('Failed to play video')
+                          }}
+                        />
+                      </div>
                     ) : (
                       <ImageViewer
                         src={mediaUrl}
                         alt={resource.field8 || 'Resource preview'}
-                        isFullscreen={isFullscreen}
+                        isFullscreen={isImageFullscreen}
+                        availableHeight={availableSpace.height}
+                        availableWidth={availableSpace.width}
                       />
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -942,13 +992,21 @@ export default function ResourceModalEnhanced({
 
 // Helper function to determine media type
 function getMediaType(resource) {
-  if (!resource?.file_extension) return 'image'
+  if (!resource) return 'image'
   
-  const ext = resource.file_extension.toLowerCase()
-  const videoExtensions = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'flv', 'wmv', 'm4v']
-  const audioExtensions = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a']
+  // Check resource_type first (more reliable than extension)
+  if (resource.resource_type === '3' || resource.resource_type === 3) return 'video'
+  if (resource.resource_type === '4' || resource.resource_type === 4) return 'audio'
   
-  if (videoExtensions.includes(ext)) return 'video'
-  if (audioExtensions.includes(ext)) return 'audio'
+  // Fall back to extension check
+  if (resource.file_extension) {
+    const ext = resource.file_extension.toLowerCase()
+    const videoExtensions = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'flv', 'wmv', 'm4v']
+    const audioExtensions = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a']
+    
+    if (videoExtensions.includes(ext)) return 'video'
+    if (audioExtensions.includes(ext)) return 'audio'
+  }
+  
   return 'image'
 }

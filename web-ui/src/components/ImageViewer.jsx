@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-export default function ImageViewer({ src, alt, isFullscreen }) {
+export default function ImageViewer({ src, alt, isFullscreen, availableWidth, availableHeight }) {
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -113,7 +113,7 @@ export default function ImageViewer({ src, alt, isFullscreen }) {
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black/50"
+      className="relative w-full h-full flex items-center justify-center overflow-hidden"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -166,35 +166,17 @@ export default function ImageViewer({ src, alt, isFullscreen }) {
         ref={imageRef}
         src={src}
         alt={alt}
-        className={`max-w-full max-h-full select-none ${
-          scale > 1 ? 'cursor-move' : 'cursor-pointer'
-        }`}
+        className="select-none object-contain"
         style={{
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-          transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+          maxWidth: availableWidth ? `${availableWidth}px` : '100%',
+          maxHeight: availableHeight ? `${availableHeight}px` : '100%',
+          cursor: scale > 1 ? 'move' : 'pointer'
         }}
         draggable={false}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
-        onLoad={() => {
-          // Fit image to container on load
-          if (imageRef.current && containerRef.current) {
-            const img = imageRef.current
-            const container = containerRef.current
-            const imgRatio = img.naturalWidth / img.naturalHeight
-            const containerRatio = container.clientWidth / container.clientHeight
-            
-            if (imgRatio > containerRatio) {
-              // Image is wider than container
-              img.style.width = '100%'
-              img.style.height = 'auto'
-            } else {
-              // Image is taller than container
-              img.style.width = 'auto'
-              img.style.height = '100%'
-            }
-          }
-        }}
       />
     </div>
   )

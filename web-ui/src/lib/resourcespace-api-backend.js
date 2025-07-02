@@ -132,13 +132,18 @@ export const resourceSpaceApi = {
   },
 
   // Get resource path/URL
-  getResourcePath: async (ref, size = '', sessionKey = null) => {
+  getResourcePath: async (ref, size = '', sessionKey = null, forceOriginal = false, extension = null) => {
+    // For videos and when forceOriginal is true, we need to get the original file
+    // not a jpg preview
+    const fileExt = forceOriginal && extension ? extension : 'jpg'
+    const generateIfMissing = forceOriginal ? 0 : 1  // Don't generate for original files
+    
     return resourceSpaceApi.apiCall('get_resource_path', {
       param1: ref,              // resource ID
       param2: '',               // not_used (should be empty string)
-      param3: size || '',       // size code (thm, pre, scr, etc)
-      param4: 1,                // generate if not exists
-      param5: 'jpg',            // extension
+      param3: size || '',       // size code (thm, pre, scr, etc) - empty for original
+      param4: generateIfMissing,// generate if not exists (0 for originals)
+      param5: fileExt,          // extension (use actual extension for videos)
       param6: 1,                // page (for multi-page docs)
       param7: 0,                // watermarked (0 = no)
       param8: -1,               // alternative (-1 = original)

@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Video.js custom theme */
+.video-js.vjs-theme-dark {
+  @apply bg-black;
+}
+
+.video-js.vjs-theme-dark .vjs-control-bar {
+  @apply bg-gradient-to-t from-black/90 to-transparent;
+}
+
+.video-js.vjs-theme-dark .vjs-big-play-button {
+  @apply bg-amber-500 rounded-full;
+  opacity: 0.9;
+  font-size: 3em;
+  line-height: 1.5em;
+  height: 1.5em;
+  width: 1.5em;
+  left: 50%;
+  top: 50%;
+  margin-left: -0.75em;
+  margin-top: -0.75em;
+}
+
+.video-js.vjs-theme-dark .vjs-big-play-button:hover {
+  @apply bg-amber-600;
+  opacity: 1;
+}
+
+.video-js.vjs-theme-dark .vjs-play-progress,
+.video-js.vjs-theme-dark .vjs-volume-level {
+  @apply bg-amber-500;
+}
+
+.video-js.vjs-theme-dark .vjs-load-progress {
+  @apply bg-gray-600;
+}
+
+.video-js.vjs-theme-dark .vjs-control-bar {
+  height: 3em;
+}
+
+.video-js.vjs-theme-dark .vjs-time-tooltip {
+  @apply bg-gray-900 text-white;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

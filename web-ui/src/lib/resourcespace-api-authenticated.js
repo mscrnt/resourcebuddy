@@ -37,9 +37,9 @@ const resourceSpaceApiAuthenticated = {
     return resourceSpaceApi.getCollectionResources(collection, sessionKey)
   },
 
-  getResourcePath: async (ref, size = '') => {
+  getResourcePath: async (ref, size = '', forceOriginal = false, extension = null) => {
     const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
-    return resourceSpaceApi.getResourcePath(ref, size, sessionKey)
+    return resourceSpaceApi.getResourcePath(ref, size, sessionKey, forceOriginal, extension)
   },
 
   getSystemStatus: async () => {
