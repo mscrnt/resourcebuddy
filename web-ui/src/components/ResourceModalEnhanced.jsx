@@ -73,12 +73,14 @@ export default function ResourceModalEnhanced({
     const calculateSpace = () => {
       if (!mediaContainerRef.current) return
       
-      const collectionBarHeight = activeCollection && !isImageFullscreen ? 176 : 0
+      const headerHeight = 45 // Ultra compact header
+      const collectionBarActualHeight = activeCollection && !isImageFullscreen ? (collectionBarHeight || 52) : 0
       const metadataPanelWidth = showMetadata && !isImageFullscreen ? metadataWidth : 0
+      const padding = 0 // No padding to maximize space
       
       setAvailableSpace({
-        width: window.innerWidth - metadataPanelWidth,
-        height: window.innerHeight - collectionBarHeight
+        width: window.innerWidth - metadataPanelWidth - padding,
+        height: window.innerHeight - headerHeight - collectionBarActualHeight - padding
       })
     }
 
@@ -118,6 +120,16 @@ export default function ResourceModalEnhanced({
       // First load the resource data to get the correct type and extension
       const data = await api.getResource(resource.ref, sessionKey)
       setResourceData(data)
+      
+      // Get thumbnail URL for video poster
+      if (data && (data.resource_type === '3' || data.resource_type === 3)) {
+        try {
+          const thumbUrl = await api.getResourcePath(data.ref, 'thm')
+          data.thumb = thumbUrl
+        } catch (err) {
+          console.error('Failed to load thumbnail:', err)
+        }
+      }
       
       // Load all other data in parallel
       await Promise.all([
@@ -574,7 +586,7 @@ export default function ResourceModalEnhanced({
                 className="relative bg-art-gray-900 border-r border-art-gray-800 overflow-y-auto flex-shrink-0"
                 style={{ 
                   width: `${metadataWidth}px`,
-                  maxHeight: `calc(100vh - ${collectionBarHeight}px)`
+                  height: activeCollection ? `calc(100vh - ${collectionBarHeight || 52}px)` : '100vh'
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -808,9 +820,9 @@ export default function ResourceModalEnhanced({
           )} onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             {!isImageFullscreen && (
-              <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/70 to-transparent p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-white truncate max-w-2xl">
+              <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/90 to-transparent" style={{ height: '45px' }}>
+              <div className="flex items-center justify-between h-full px-3">
+                <h2 className="text-base font-medium text-white truncate max-w-2xl">
                   {resource.field8 || `Resource ${resource.ref}`}
                 </h2>
                 <div className="flex items-center space-x-2">
@@ -818,50 +830,50 @@ export default function ResourceModalEnhanced({
                     <button
                       onClick={toggleResourceInCollection}
                       className={cn(
-                        "p-2 rounded-lg transition-colors",
+                        "p-1.5 rounded-md transition-colors",
                         isInCollection 
                           ? "bg-art-accent hover:bg-art-accent-dark text-white" 
                           : "bg-white/10 hover:bg-white/20 text-white"
                       )}
                       title={isInCollection ? `Remove from ${activeCollection.name}` : `Add to ${activeCollection.name}`}
                     >
-                      {isInCollection ? <FolderMinus className="h-5 w-5" /> : <FolderPlus className="h-5 w-5" />}
+                      {isInCollection ? <FolderMinus className="h-4 w-4" /> : <FolderPlus className="h-4 w-4" />}
                     </button>
                   )}
                   <button
                     onClick={generateShareLink}
-                    className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
                     title="Share"
                   >
-                    <Share2 className="h-5 w-5" />
+                    <Share2 className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setShowMetadata(!showMetadata)}
-                    className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
                     title="Toggle metadata (I)"
                   >
-                    <Info className="h-5 w-5" />
+                    <Info className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setIsImageFullscreen(!isImageFullscreen)}
-                    className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
                     title="Fullscreen Image (F)"
                   >
-                    <Expand className="h-5 w-5" />
+                    <Expand className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setIsFullscreen(!isFullscreen)}
-                    className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
                     title="Maximize Modal"
                   >
-                    <Maximize2 className="h-5 w-5" />
+                    <Maximize2 className="h-4 w-4" />
                   </button>
                   <button
                     onClick={onClose}
-                    className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
                     title="Close (ESC)"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -883,7 +895,7 @@ export default function ResourceModalEnhanced({
             {hasPrevious && (
               <button
                 onClick={onPrevious}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all transform hover:scale-110"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-25 p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition-all transform hover:scale-110 backdrop-blur-sm"
                 title="Previous (←)"
               >
                 <ChevronLeft className="h-6 w-6" />
@@ -893,7 +905,7 @@ export default function ResourceModalEnhanced({
             {hasNext && (
               <button
                 onClick={onNext}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all transform hover:scale-110"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-25 p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition-all transform hover:scale-110 backdrop-blur-sm"
                 title="Next (→)"
               >
                 <ChevronRight className="h-6 w-6" />
@@ -903,15 +915,16 @@ export default function ResourceModalEnhanced({
             {/* Media Container */}
             <div 
               ref={mediaContainerRef}
-              className={cn(
-                "h-full flex items-center justify-center",
-                activeCollection && !isImageFullscreen && "pb-44" // Account for collection bar
-              )}
+              className="absolute inset-0 flex items-center justify-center"
+              style={{
+                top: isImageFullscreen ? 0 : '45px',
+                bottom: activeCollection && !isImageFullscreen ? `${collectionBarHeight || 52}px` : 0,
+                left: 0,
+                right: 0,
+                padding: 0
+              }}
             >
-              <div className={cn(
-                "relative w-full h-full flex items-center justify-center",
-                isImageFullscreen && "w-full h-full"
-              )}>
+              <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                 {loading && (
                   <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
@@ -926,20 +939,31 @@ export default function ResourceModalEnhanced({
                 )}
                 
                 {!loading && !error && mediaUrl && (
-                  <div className="w-full h-full flex items-center justify-center">
+                  <div className="media-container w-full h-full flex items-center justify-center">
                     {mediaType === 'video' ? (
-                      <div className="w-full h-full max-w-full max-h-full">
-                        <VideoPlayerPro
+                      <div className="w-full h-full flex items-center justify-center bg-black">
+                        <video
+                          controls
+                          autoPlay={false}
+                          preload="metadata"
+                          playsInline
+                          className="w-full h-full rounded-lg shadow-2xl"
+                          style={{ 
+                            objectFit: 'contain',
+                            backgroundColor: 'black',
+                            maxWidth: '100%',
+                            maxHeight: '100%'
+                          }}
                           src={mediaUrl}
-                          poster={null} // Could add poster URL if available
-                          title={(resourceData || resource).field8 || `Resource ${resource.ref}`}
-                          resource={resourceData || resource}
-                          isFullscreen={isImageFullscreen}
+                          poster={resourceData?.thumb || null}
                           onError={(err) => {
-                            console.error('Video player error:', err)
+                            console.error('Video error:', err)
                             setError('Failed to play video')
                           }}
-                        />
+                        >
+                          <source src={mediaUrl} type={getVideoMimeType(resourceData?.file_extension || 'mp4')} />
+                          Your browser does not support the video tag.
+                        </video>
                       </div>
                     ) : (
                       <ImageViewer
@@ -1009,4 +1033,20 @@ function getMediaType(resource) {
   }
   
   return 'image'
+}
+
+// Helper function to get proper MIME type for video
+function getVideoMimeType(extension) {
+  const mimeTypes = {
+    'mp4': 'video/mp4',
+    'webm': 'video/webm',
+    'mov': 'video/quicktime',
+    'avi': 'video/x-msvideo',
+    'mkv': 'video/x-matroska',
+    'flv': 'video/x-flv',
+    'wmv': 'video/x-ms-wmv',
+    'm4v': 'video/mp4',
+    'ogv': 'video/ogg'
+  }
+  return mimeTypes[extension.toLowerCase()] || 'video/mp4'
 }

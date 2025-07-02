@@ -170,6 +170,8 @@ export default function ImageViewer({ src, alt, isFullscreen, availableWidth, av
         style={{
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
           transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+          width: '100%',
+          height: '100%',
           maxWidth: availableWidth ? `${availableWidth}px` : '100%',
           maxHeight: availableHeight ? `${availableHeight}px` : '100%',
           cursor: scale > 1 ? 'move' : 'pointer'

@@ -259,7 +259,7 @@ export default function VideoPlayerPro({
         playsInline
         preload="auto"
       >
-        <source src={src} type={`video/${resource?.file_extension || 'mp4'}`} />
+        <source src={src} type={getVideoMimeType(resource?.file_extension || 'mp4')} />
         <p className="vjs-no-js">
           To view this video please enable JavaScript, and consider upgrading to a web browser that
           supports HTML5 video.
@@ -282,4 +282,20 @@ export default function VideoPlayerPro({
       </div>
     </div>
   )
+}
+
+// Helper function to get proper MIME type for video
+function getVideoMimeType(extension) {
+  const mimeTypes = {
+    'mp4': 'video/mp4',
+    'webm': 'video/webm',
+    'mov': 'video/quicktime',
+    'avi': 'video/x-msvideo',
+    'mkv': 'video/x-matroska',
+    'flv': 'video/x-flv',
+    'wmv': 'video/x-ms-wmv',
+    'm4v': 'video/mp4',
+    'ogv': 'video/ogg'
+  }
+  return mimeTypes[extension.toLowerCase()] || 'video/mp4'
 }
