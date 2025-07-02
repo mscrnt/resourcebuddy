@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Eye, Download, Share2, Plus, X, MoreVertical, FolderPlus, GripHorizontal, Trash2, Edit3 } from 'lucide-react'
+import { ChevronDown, Eye, Download, Share2, Plus, X, MoreVertical, FolderPlus, GripHorizontal, Trash2, Edit3, FileText, Calendar, User } from 'lucide-react'
 import axios from 'axios'
 import useAuthStore from '../stores/useAuthStore'
 import useSettingsStore from '../stores/useSettingsStore'
@@ -8,12 +8,15 @@ import { cn } from '../lib/utils'
 import { useNavigate } from 'react-router-dom'
 import resourceSpaceApi from '../lib/resourcespace-api-backend'
 import { useApi } from '../contexts/ApiContext'
+import ResourceModalEnhanced from './ResourceModalEnhanced'
 
-// Compact Thumbnail component optimized for dense grid
-function ResourceThumbnail({ resource, onRemove }) {
+// Enhanced Thumbnail component with metadata popover
+function ResourceThumbnail({ resource, onRemove, showPopover, onPopoverToggle, onResourceOpen }) {
   const [thumbUrl, setThumbUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showTooltip, setShowTooltip] = useState(false)
+  const popoverRef = useRef(null)
+  const thumbnailRef = useRef(null)
   const api = useApi()
 
   useEffect(() => {
@@ -31,14 +34,49 @@ function ResourceThumbnail({ resource, onRemove }) {
   }, [resource.ref, api])
 
   const title = resource.field8 || `Resource ${resource.ref}`
+  const truncatedTitle = title.length > 60 ? title.substring(0, 57) + '...' : title
+  
+  // Format file size
+  const formatFileSize = (bytes) => {
+    if (!bytes) return 'Unknown size'
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(1024))
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`
+  }
+
+  // Get file type from extension
+  const getFileType = () => {
+    const ext = resource.file_extension?.toUpperCase() || 'FILE'
+    const typeMap = {
+      JPG: 'Image', JPEG: 'Image', PNG: 'Image', GIF: 'Image', 
+      MP4: 'Video', MOV: 'Video', AVI: 'Video',
+      PDF: 'Document', DOC: 'Document', DOCX: 'Document'
+    }
+    return typeMap[ext] || ext
+  }
+
+  const handleClick = (e) => {
+    e.stopPropagation()
+    if (showPopover) {
+      // Second click - open modal
+      onResourceOpen(resource)
+    } else {
+      // First click - show popover
+      onPopoverToggle(resource.ref)
+    }
+  }
 
   return (
-    <div 
-      className="relative group"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
-      <div className="w-[124px] h-[124px] bg-gray-100 dark:bg-art-gray-800 rounded overflow-hidden border border-gray-200 dark:border-art-gray-700 hover:border-gray-300 dark:hover:border-art-gray-600 transition-colors">
+    <div className="relative group">
+      <div 
+        ref={thumbnailRef}
+        className="w-[124px] h-[124px] bg-gray-100 dark:bg-art-gray-800 rounded overflow-hidden border border-gray-200 dark:border-art-gray-700 hover:border-gray-300 dark:hover:border-art-gray-600 transition-colors cursor-pointer"
+        onClick={handleClick}
+        onMouseEnter={() => !showPopover && setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        title={`${truncatedTitle} • ID: ${resource.ref}`}
+        data-thumbnail="true"
+      >
         {loading ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="animate-spin rounded-full h-3 w-3 border-b border-amber-500 dark:border-art-accent"></div>
@@ -58,21 +96,92 @@ function ResourceThumbnail({ resource, onRemove }) {
       
       {/* Remove button */}
       <button
-        onClick={onRemove}
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }}
         className="absolute top-1 right-1 p-0.5 bg-red-600 hover:bg-red-700 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 shadow"
         title="Remove from collection"
       >
         <X className="h-3 w-3 text-white" />
       </button>
       
-      {/* Tooltip */}
-      {showTooltip && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-black text-white text-xs rounded shadow-lg whitespace-nowrap pointer-events-none z-20">
-          {title}
+      {/* Enhanced Tooltip - only show when popover is not open */}
+      {showTooltip && !showPopover && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-black text-white text-xs rounded shadow-lg whitespace-nowrap pointer-events-none z-20 max-w-xs">
+          <div className="truncate">{truncatedTitle}</div>
+          <div className="text-gray-300">ID: {resource.ref}</div>
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
             <div className="w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-gray-900 dark:border-t-black"></div>
           </div>
         </div>
+      )}
+      
+      {/* Metadata Popover */}
+      {showPopover && createPortal(
+        <div
+          ref={popoverRef}
+          className="popover-content absolute bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-700 rounded-lg shadow-xl p-3 min-w-[200px] max-w-[280px] z-[100]"
+          style={{
+            position: 'fixed',
+            bottom: thumbnailRef.current ? `${window.innerHeight - thumbnailRef.current.getBoundingClientRect().top + 8}px` : '0',
+            left: thumbnailRef.current ? `${thumbnailRef.current.getBoundingClientRect().left + (thumbnailRef.current.offsetWidth / 2)}px` : '0',
+            transform: 'translateX(-50%)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Arrow pointing down */}
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white dark:border-t-art-gray-900"></div>
+            <div className="absolute -top-[9px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-gray-200 dark:border-t-art-gray-700"></div>
+          </div>
+          
+          {/* Popover Content */}
+          <div className="space-y-2">
+            {/* Title */}
+            <div>
+              <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                {title}
+              </h4>
+            </div>
+            
+            {/* Metadata */}
+            <div className="space-y-1 text-xs text-gray-600 dark:text-art-gray-400">
+              <div className="flex items-center gap-2">
+                <FileText className="h-3 w-3" />
+                <span>{getFileType()} • {resource.file_extension?.toUpperCase() || 'N/A'}</span>
+              </div>
+              
+              {resource.file_size && (
+                <div className="flex items-center gap-2">
+                  <span className="ml-5">{formatFileSize(resource.file_size)}</span>
+                </div>
+              )}
+              
+              {resource.creation_date && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-3 w-3" />
+                  <span>{new Date(resource.creation_date).toLocaleDateString()}</span>
+                </div>
+              )}
+              
+              {resource.created_by && (
+                <div className="flex items-center gap-2">
+                  <User className="h-3 w-3" />
+                  <span className="truncate">{resource.created_by}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Click hint */}
+            <div className="pt-2 border-t border-gray-200 dark:border-art-gray-700">
+              <p className="text-xs text-gray-500 dark:text-art-gray-500 text-center">
+                Click again to open
+              </p>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -110,6 +219,9 @@ export default function CollectionBarFooter({
   const [isResizing, setIsResizing] = useState(false)
   const [startY, setStartY] = useState(0)
   const [startHeight, setStartHeight] = useState(0)
+  const [activePopover, setActivePopover] = useState(null)
+  const [selectedResourceForModal, setSelectedResourceForModal] = useState(null)
+  const [modalOpen, setModalOpen] = useState(false)
   
   const { sessionKey, user } = useAuthStore()
   const { getSetting, fetchSettings } = useSettingsStore()
@@ -167,6 +279,32 @@ export default function CollectionBarFooter({
       fetchCollectionResources()
     }
   }, [collection])
+
+  // Handle ESC key and outside clicks for popover
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && activePopover) {
+        setActivePopover(null)
+      }
+    }
+
+    const handleOutsideClick = (e) => {
+      // Check if click is outside popover and not on a thumbnail
+      if (activePopover && !e.target.closest('.popover-content') && !e.target.closest('[data-thumbnail]')) {
+        setActivePopover(null)
+      }
+    }
+
+    if (activePopover) {
+      document.addEventListener('keydown', handleEscape)
+      document.addEventListener('mousedown', handleOutsideClick)
+      
+      return () => {
+        document.removeEventListener('keydown', handleEscape)
+        document.removeEventListener('mousedown', handleOutsideClick)
+      }
+    }
+  }, [activePopover])
 
   const fetchAllCollections = async () => {
     try {
@@ -346,6 +484,22 @@ export default function CollectionBarFooter({
     } catch (error) {
       console.error('Failed to remove resource from collection:', error)
     }
+  }
+
+  const handlePopoverToggle = (resourceRef) => {
+    if (activePopover === resourceRef) {
+      // Same resource clicked - close popover
+      setActivePopover(null)
+    } else {
+      // Different resource - open new popover
+      setActivePopover(resourceRef)
+    }
+  }
+
+  const handleResourceOpen = (resource) => {
+    setActivePopover(null)
+    setSelectedResourceForModal(resource)
+    setModalOpen(true)
   }
 
   const handleCollectionSelect = (selectedCollection) => {
@@ -781,6 +935,9 @@ export default function CollectionBarFooter({
                           key={resource.ref}
                           resource={resource}
                           onRemove={() => handleRemoveResource(resource.ref)}
+                          showPopover={activePopover === resource.ref}
+                          onPopoverToggle={handlePopoverToggle}
+                          onResourceOpen={handleResourceOpen}
                         />
                       ))}
                     </div>
@@ -827,6 +984,34 @@ export default function CollectionBarFooter({
           </div>
         </div>
       )}
+      
+      {/* Resource Modal */}
+      <ResourceModalEnhanced
+        resource={selectedResourceForModal}
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false)
+          setSelectedResourceForModal(null)
+        }}
+        onNext={() => {
+          const currentIndex = resources.findIndex(r => r.ref === selectedResourceForModal?.ref)
+          if (currentIndex < resources.length - 1) {
+            setSelectedResourceForModal(resources[currentIndex + 1])
+          }
+        }}
+        onPrevious={() => {
+          const currentIndex = resources.findIndex(r => r.ref === selectedResourceForModal?.ref)
+          if (currentIndex > 0) {
+            setSelectedResourceForModal(resources[currentIndex - 1])
+          }
+        }}
+        hasNext={selectedResourceForModal && resources.findIndex(r => r.ref === selectedResourceForModal.ref) < resources.length - 1}
+        hasPrevious={selectedResourceForModal && resources.findIndex(r => r.ref === selectedResourceForModal.ref) > 0}
+        context="collection"
+        collectionId={collection?.ref}
+        activeCollection={collection}
+        collectionBarHeight={showThumbs ? panelHeight : COMPACT_HEIGHT}
+      />
     </>,
     document.body
   )
