@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Eye, Download, Share2, Plus, X, MoreVertical, FolderPlus, GripHorizontal, Trash2, Edit3, FileText, Calendar, User } from 'lucide-react'
+import { ChevronDown, Eye, Download, Share2, Plus, X, MoreVertical, FolderPlus, GripHorizontal, Trash2, Edit3, FileText, Calendar, User, Search, Folder, Globe } from 'lucide-react'
 import axios from 'axios'
 import useAuthStore from '../stores/useAuthStore'
 import useSettingsStore from '../stores/useSettingsStore'
@@ -9,6 +9,134 @@ import { useNavigate } from 'react-router-dom'
 import resourceSpaceApi from '../lib/resourcespace-api-backend'
 import { useApi } from '../contexts/ApiContext'
 import ResourceModalEnhanced from './ResourceModalEnhanced'
+
+// Collection Dropdown Component
+function CollectionDropdown({ collections, collection, onSelect, onCreate, searchQuery, onSearchChange, searchResults, searchLoading, searchInputRef }) {
+  const displayCollections = searchResults !== null ? searchResults : [...collections.user, ...collections.featured]
+  const hasUserCollections = searchResults === null && collections.user.length > 0
+  const hasFeaturedCollections = searchResults === null && collections.featured.length > 0
+  
+  return (
+    <>
+      {/* Search Input */}
+      <div className="p-2 border-b border-gray-200 dark:border-art-gray-800">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400 dark:text-art-gray-500" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={onSearchChange}
+            placeholder="Search collections..."
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-gray-50 dark:bg-art-gray-800 border border-gray-200 dark:border-art-gray-700 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-art-accent"
+          />
+        </div>
+      </div>
+      
+      <div className="max-h-64 overflow-y-auto">
+        {searchLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-500 dark:border-art-accent"></div>
+          </div>
+        ) : searchResults !== null && searchResults.length === 0 ? (
+          <div className="px-3 py-8 text-center text-sm text-gray-500 dark:text-art-gray-500">
+            No collections found
+          </div>
+        ) : (
+          <>
+            {/* User Collections */}
+            {hasUserCollections && (
+              <>
+                <div className="px-2 py-1 text-xs font-semibold text-gray-600 dark:text-art-gray-400 uppercase bg-gray-100 dark:bg-art-gray-800 flex items-center gap-1">
+                  <Folder className="h-3 w-3" />
+                  My Collections
+                </div>
+                {collections.user.map(col => (
+                  <button
+                    key={col.ref}
+                    onClick={() => onSelect(col)}
+                    className={cn(
+                      "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors flex items-center justify-between group",
+                      collection?.ref === col.ref ? "bg-gray-100 dark:bg-art-gray-800 text-amber-600 dark:text-art-accent" : "text-gray-900 dark:text-white"
+                    )}
+                  >
+                    <span className="truncate">{col.name}</span>
+                    {col.count !== undefined && (
+                      <span className="text-xs text-gray-500 dark:text-art-gray-400 group-hover:text-gray-700 dark:group-hover:text-art-gray-300">
+                        ({col.count})
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+            
+            {/* Featured Collections */}
+            {hasFeaturedCollections && (
+              <>
+                <div className="px-2 py-1 text-xs font-semibold text-gray-600 dark:text-art-gray-400 uppercase bg-gray-100 dark:bg-art-gray-800 flex items-center gap-1 mt-px">
+                  <Globe className="h-3 w-3" />
+                  Featured Collections
+                </div>
+                {collections.featured.map(col => (
+                  <button
+                    key={col.ref}
+                    onClick={() => onSelect(col)}
+                    className={cn(
+                      "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors flex items-center justify-between group",
+                      collection?.ref === col.ref ? "bg-gray-100 dark:bg-art-gray-800 text-amber-600 dark:text-art-accent" : "text-gray-900 dark:text-white"
+                    )}
+                  >
+                    <span className="truncate">{col.name}</span>
+                    {col.count !== undefined && (
+                      <span className="text-xs text-gray-500 dark:text-art-gray-400 group-hover:text-gray-700 dark:group-hover:text-art-gray-300">
+                        ({col.count})
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+            
+            {/* Search Results */}
+            {searchResults !== null && (
+              <>
+                {searchResults.map(col => (
+                  <button
+                    key={col.ref}
+                    onClick={() => onSelect(col)}
+                    className={cn(
+                      "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors flex items-center justify-between group",
+                      collection?.ref === col.ref ? "bg-gray-100 dark:bg-art-gray-800 text-amber-600 dark:text-art-accent" : "text-gray-900 dark:text-white"
+                    )}
+                  >
+                    <span className="truncate">{col.name}</span>
+                    {col.count !== undefined && (
+                      <span className="text-xs text-gray-500 dark:text-art-gray-400 group-hover:text-gray-700 dark:group-hover:text-art-gray-300">
+                        ({col.count})
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+          </>
+        )}
+        
+        {/* Create New Collection Button */}
+        <div className="border-t border-gray-200 dark:border-art-gray-800 mt-1">
+          <button
+            onClick={onCreate}
+            className="w-full px-3 py-2 text-left text-sm text-amber-600 dark:text-art-accent hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors flex items-center gap-2"
+          >
+            <FolderPlus className="h-4 w-4" />
+            Create New Collection
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
 
 // Enhanced Thumbnail component with metadata popover
 function ResourceThumbnail({ resource, onRemove, showPopover, onPopoverToggle, onResourceOpen }) {
@@ -222,6 +350,11 @@ export default function CollectionBarFooter({
   const [activePopover, setActivePopover] = useState(null)
   const [selectedResourceForModal, setSelectedResourceForModal] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [collectionSearchQuery, setCollectionSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchTimeoutRef = useRef(null)
+  const searchInputRef = useRef(null)
   
   const { sessionKey, user } = useAuthStore()
   const { getSetting, fetchSettings } = useSettingsStore()
@@ -280,22 +413,28 @@ export default function CollectionBarFooter({
     }
   }, [collection])
 
-  // Handle ESC key and outside clicks for popover
+  // Handle ESC key and outside clicks for all dropdowns and popovers
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape' && activePopover) {
-        setActivePopover(null)
+      if (e.key === 'Escape') {
+        if (activePopover) setActivePopover(null)
+        if (showCollectionDropdown) setShowCollectionDropdown(false)
+        if (showActionsDropdown) setShowActionsDropdown(false)
       }
     }
 
     const handleOutsideClick = (e) => {
-      // Check if click is outside popover and not on a thumbnail
-      if (activePopover && !e.target.closest('.popover-content') && !e.target.closest('[data-thumbnail]')) {
-        setActivePopover(null)
-      }
+      // Check if click is outside all dropdowns and popovers
+      const isOutsidePopover = activePopover && !e.target.closest('.popover-content') && !e.target.closest('[data-thumbnail]')
+      const isOutsideCollectionDropdown = showCollectionDropdown && !e.target.closest('[data-collection-dropdown]') && !e.target.closest('[data-collection-trigger]')
+      const isOutsideActionsDropdown = showActionsDropdown && !e.target.closest('[data-actions-dropdown]') && !e.target.closest('[data-actions-trigger]')
+      
+      if (isOutsidePopover) setActivePopover(null)
+      if (isOutsideCollectionDropdown) setShowCollectionDropdown(false)
+      if (isOutsideActionsDropdown) setShowActionsDropdown(false)
     }
 
-    if (activePopover) {
+    if (activePopover || showCollectionDropdown || showActionsDropdown) {
       document.addEventListener('keydown', handleEscape)
       document.addEventListener('mousedown', handleOutsideClick)
       
@@ -304,7 +443,7 @@ export default function CollectionBarFooter({
         document.removeEventListener('mousedown', handleOutsideClick)
       }
     }
-  }, [activePopover])
+  }, [activePopover, showCollectionDropdown, showActionsDropdown])
 
   const fetchAllCollections = async () => {
     try {
@@ -502,6 +641,62 @@ export default function CollectionBarFooter({
     setModalOpen(true)
   }
 
+  // Search collections with debounce
+  const searchCollections = async (query) => {
+    if (!query.trim()) {
+      setSearchResults(null)
+      return
+    }
+
+    setSearchLoading(true)
+    try {
+      // For now, we'll filter locally since search_public_collections might not be available
+      // In a real implementation, this would call: resourceSpaceApi.searchPublicCollections(query, 'name', 'ASC', 0)
+      const allCollections = [...collections.user, ...collections.featured]
+      const filtered = allCollections.filter(col => 
+        col.name.toLowerCase().includes(query.toLowerCase()) ||
+        col.ref.toString().includes(query)
+      )
+      setSearchResults(filtered)
+    } catch (error) {
+      console.error('Failed to search collections:', error)
+      setSearchResults([])
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  // Handle search input with debounce
+  const handleSearchInput = (e) => {
+    const query = e.target.value
+    setCollectionSearchQuery(query)
+
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(() => {
+      searchCollections(query)
+    }, 300)
+  }
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (showCollectionDropdown && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [showCollectionDropdown])
+
+  // Clear search when dropdown closes
+  useEffect(() => {
+    if (!showCollectionDropdown) {
+      setCollectionSearchQuery('')
+      setSearchResults(null)
+    }
+  }, [showCollectionDropdown])
+
   const handleCollectionSelect = (selectedCollection) => {
     onCollectionChange(selectedCollection)
     setShowCollectionDropdown(false)
@@ -616,8 +811,12 @@ export default function CollectionBarFooter({
               {/* Collection Selector - Inline */}
               <div className="relative">
                 <button
-                  onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
+                  onClick={() => {
+                    setShowCollectionDropdown(!showCollectionDropdown)
+                    setShowActionsDropdown(false)
+                  }}
                   className="flex items-center gap-1.5 px-2 py-0.5 text-xs hover:bg-gray-100 dark:hover:bg-art-gray-800 rounded transition-colors"
+                  data-collection-trigger="true"
                 >
                   <span className="font-medium text-gray-900 dark:text-white">
                     {collection?.name || 'Select Collection'}
@@ -632,40 +831,21 @@ export default function CollectionBarFooter({
 
                 {/* Collection Dropdown */}
                 {showCollectionDropdown && (
-                  <div className="absolute bottom-full left-0 mb-1 w-64 bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded shadow-xl overflow-hidden z-50">
-                    <div className="max-h-64 overflow-y-auto">
-                      {collections.user.length > 0 && (
-                        <>
-                          <div className="px-2 py-1 text-xs font-semibold text-gray-600 dark:text-art-gray-400 uppercase bg-gray-100 dark:bg-art-gray-800">
-                            My Collections
-                          </div>
-                          {collections.user.map(col => (
-                            <button
-                              key={col.ref}
-                              onClick={() => handleCollectionSelect(col)}
-                              className={cn(
-                                "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors",
-                                collection?.ref === col.ref ? "bg-gray-100 dark:bg-art-gray-800 text-amber-600 dark:text-art-accent" : "text-gray-900 dark:text-white"
-                              )}
-                            >
-                              {col.name}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      <div className="border-t border-gray-200 dark:border-art-gray-800">
-                        <button
-                          onClick={() => {
-                            setShowCollectionDropdown(false)
-                            setShowNewCollectionModal(true)
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm text-amber-600 dark:text-art-accent hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors flex items-center gap-2"
-                        >
-                          <FolderPlus className="h-4 w-4" />
-                          Create New Collection
-                        </button>
-                      </div>
-                    </div>
+                  <div className="absolute bottom-full left-0 mb-1 w-80 bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded-lg shadow-xl overflow-hidden z-50" data-collection-dropdown="true">
+                    <CollectionDropdown
+                      collections={collections}
+                      collection={collection}
+                      onSelect={handleCollectionSelect}
+                      onCreate={() => {
+                        setShowCollectionDropdown(false)
+                        setShowNewCollectionModal(true)
+                      }}
+                      searchQuery={collectionSearchQuery}
+                      onSearchChange={handleSearchInput}
+                      searchResults={searchResults}
+                      searchLoading={searchLoading}
+                      searchInputRef={searchInputRef}
+                    />
                   </div>
                 )}
               </div>
@@ -705,15 +885,19 @@ export default function CollectionBarFooter({
                   {/* More Actions */}
                   <div className="relative">
                     <button
-                      onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                      onClick={() => {
+                        setShowActionsDropdown(!showActionsDropdown)
+                        setShowCollectionDropdown(false)
+                      }}
                       className="p-1 text-gray-500 dark:text-art-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-art-gray-800 rounded transition-colors"
                       title="More Actions"
+                      data-actions-trigger="true"
                     >
                       <MoreVertical className="h-3 w-3" />
                     </button>
 
                     {showActionsDropdown && (
-                      <div className="absolute bottom-full left-0 mb-1 w-40 bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded shadow-xl overflow-hidden">
+                      <div className="absolute bottom-full left-0 mb-1 w-40 bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded shadow-xl overflow-hidden" data-actions-dropdown="true">
                         <button
                           onClick={() => {
                             handleRemoveAllResources()
@@ -763,8 +947,12 @@ export default function CollectionBarFooter({
                 {/* Collection Dropdown - No label */}
                 <div className="relative">
                   <button
-                    onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
+                    onClick={() => {
+                      setShowCollectionDropdown(!showCollectionDropdown)
+                      setShowActionsDropdown(false)
+                    }}
                     className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 bg-white dark:bg-art-gray-800 hover:bg-gray-100 dark:hover:bg-art-gray-700 rounded border border-gray-200 dark:border-art-gray-700 transition-colors"
+                    data-collection-trigger="true"
                   >
                     <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {collection ? `${collection.name} (${resources.length})` : 'Select Collection'}
@@ -774,40 +962,21 @@ export default function CollectionBarFooter({
 
                   {/* Collection Dropdown Menu */}
                   {showCollectionDropdown && (
-                    <div className="absolute bottom-full left-0 mb-1 w-full bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded shadow-xl overflow-hidden z-50">
-                      <div className="max-h-64 overflow-y-auto">
-                        {collections.user.length > 0 && (
-                          <>
-                            <div className="px-2 py-1 text-xs font-semibold text-gray-600 dark:text-art-gray-400 uppercase bg-gray-100 dark:bg-art-gray-800">
-                              My Collections
-                            </div>
-                            {collections.user.map(col => (
-                              <button
-                                key={col.ref}
-                                onClick={() => handleCollectionSelect(col)}
-                                className={cn(
-                                  "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors",
-                                  collection?.ref === col.ref ? "bg-gray-100 dark:bg-art-gray-800 text-amber-600 dark:text-art-accent" : "text-gray-900 dark:text-white"
-                                )}
-                              >
-                                {col.name}
-                              </button>
-                            ))}
-                          </>
-                        )}
-                        <div className="border-t border-gray-200 dark:border-art-gray-800">
-                          <button
-                            onClick={() => {
-                              setShowCollectionDropdown(false)
-                              setShowNewCollectionModal(true)
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-amber-600 dark:text-art-accent hover:bg-gray-100 dark:hover:bg-art-gray-800 transition-colors flex items-center gap-2"
-                          >
-                            <FolderPlus className="h-4 w-4" />
-                            Create New Collection
-                          </button>
-                        </div>
-                      </div>
+                    <div className="absolute bottom-full left-0 mb-1 w-full min-w-[320px] bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded-lg shadow-xl overflow-hidden z-50" data-collection-dropdown="true">
+                      <CollectionDropdown
+                        collections={collections}
+                        collection={collection}
+                        onSelect={handleCollectionSelect}
+                        onCreate={() => {
+                          setShowCollectionDropdown(false)
+                          setShowNewCollectionModal(true)
+                        }}
+                        searchQuery={collectionSearchQuery}
+                        onSearchChange={handleSearchInput}
+                        searchResults={searchResults}
+                        searchLoading={searchLoading}
+                        searchInputRef={searchInputRef}
+                      />
                     </div>
                   )}
                 </div>
@@ -816,8 +985,12 @@ export default function CollectionBarFooter({
                 {collection && (
                   <div className="relative">
                     <button
-                      onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                      onClick={() => {
+                        setShowActionsDropdown(!showActionsDropdown)
+                        setShowCollectionDropdown(false)
+                      }}
                       className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 bg-white dark:bg-art-gray-800 hover:bg-gray-100 dark:hover:bg-art-gray-700 rounded border border-gray-200 dark:border-art-gray-700 transition-colors"
+                      data-actions-trigger="true"
                     >
                       <span className="text-sm text-gray-900 dark:text-white">Actions</span>
                       <ChevronDown className="h-3.5 w-3.5 text-gray-500 dark:text-art-gray-400 flex-shrink-0" />
@@ -825,7 +998,7 @@ export default function CollectionBarFooter({
 
                     {/* Actions Dropdown Menu */}
                     {showActionsDropdown && (
-                      <div className="absolute bottom-full left-0 mb-1 w-full bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded shadow-xl overflow-hidden z-50">
+                      <div className="absolute bottom-full left-0 mb-1 w-full bg-white dark:bg-art-gray-900 border border-gray-200 dark:border-art-gray-800 rounded shadow-xl overflow-hidden z-50" data-actions-dropdown="true">
                         <button
                           onClick={() => {
                             handleViewAllResources()
