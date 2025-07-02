@@ -6,6 +6,8 @@ const cors = require('cors');
 const multer = require('multer');
 const FormData = require('form-data');
 const fs = require('fs');
+const path = require('path');
+const { getSettings, updateSettings, getSetting, setSetting, getUserProfile, createOrUpdateUserProfile, updateUserTheme } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,11 +15,14 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: ['http://localhost:3002', 'http://localhost:3000'],
+  origin: ['http://localhost:3002', 'http://localhost:3000', 'http://localhost:3004'],
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Serve static files for profile pictures
+app.use('/uploads/profile_pics', express.static(path.join(__dirname, 'uploads/profile_pics')));
 
 // Test endpoint
 app.get('/test', (req, res) => {
@@ -189,6 +194,35 @@ const upload = multer({
   }
 });
 
+// Configure multer for profile picture uploads
+const profilePicStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, 'uploads/profile_pics');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, `${req.params.ref}${ext}`);
+  }
+});
+
+const profilePicUpload = multer({ 
+  storage: profilePicStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
 // Upload endpoint - handles file upload to ResourceSpace
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
@@ -298,6 +332,199 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// Settings management endpoints
+
+// Get all settings
+app.get('/api/settings', async (req, res) => {
+  try {
+    const settings = getSettings();
+    res.json(settings);
+  } catch (error) {
+    console.error('Error reading settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to read settings'
+    });
+  }
+});
+
+// Get specific setting
+app.get('/api/settings/:key', async (req, res) => {
+  try {
+    const value = getSetting(req.params.key);
+    res.json({ key: req.params.key, value });
+  } catch (error) {
+    console.error('Error reading setting:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to read setting'
+    });
+  }
+});
+
+// Update settings (requires admin permission)
+app.put('/api/settings', async (req, res) => {
+  try {
+    // TODO: Add proper permission check with session
+    const newSettings = req.body;
+    
+    // Basic validation
+    if (newSettings.appTitle !== undefined && (!newSettings.appTitle || typeof newSettings.appTitle !== 'string')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid app title'
+      });
+    }
+    
+    // Update settings in database
+    updateSettings(newSettings);
+    
+    // Return all current settings
+    const allSettings = getSettings();
+    
+    res.json({
+      success: true,
+      settings: allSettings
+    });
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update settings'
+    });
+  }
+});
+
+// Check user permissions
+app.post('/api/check-permission', async (req, res) => {
+  try {
+    const { permission, sessionKey } = req.body;
+    
+    if (!sessionKey) {
+      return res.json({ hasPermission: false });
+    }
+    
+    // Call ResourceSpace checkperm function
+    const checkPermResult = await axios.get(
+      `${RS_API_URL}?user=${RS_USER}&function=checkperm&param1=${permission}&sign=${signRequest(`user=${RS_USER}&function=checkperm&param1=${permission}`)}`
+    );
+    
+    res.json({
+      hasPermission: checkPermResult.data === true || checkPermResult.data === 'true'
+    });
+  } catch (error) {
+    console.error('Error checking permission:', error);
+    res.json({ hasPermission: false });
+  }
+});
+
+// Get user metadata from ResourceSpace
+app.post('/api/user-metadata', async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'Username required' });
+    }
+    
+    // Call ResourceSpace get_users function
+    const getUsersResult = await axios.get(
+      `${RS_API_URL}?user=${RS_USER}&function=get_users&param1=${username}&sign=${signRequest(`user=${RS_USER}&function=get_users&param1=${username}`)}`
+    );
+    
+    if (getUsersResult.data && getUsersResult.data.length > 0) {
+      const userData = getUsersResult.data[0];
+      
+      // Check or create user profile in local DB
+      let profile = getUserProfile(userData.ref);
+      if (!profile) {
+        createOrUpdateUserProfile({
+          ref: userData.ref,
+          username: userData.username,
+          theme_preference: 'dark'
+        });
+        profile = getUserProfile(userData.ref);
+      }
+      
+      res.json({
+        success: true,
+        user: {
+          ref: userData.ref,
+          username: userData.username,
+          fullname: userData.fullname,
+          usergroup: userData.usergroup,
+          email: userData.email,
+          // Include local profile data
+          bio: profile?.bio || '',
+          profile_picture: profile?.profile_picture || '',
+          theme_preference: profile?.theme_preference || 'dark'
+        }
+      });
+    } else {
+      res.status(404).json({ success: false, error: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Error fetching user metadata:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch user metadata' });
+  }
+});
+
+// Update user profile
+app.put('/api/user-profile/:ref', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { bio, profile_picture, theme_preference, username } = req.body;
+    
+    createOrUpdateUserProfile({
+      ref: parseInt(ref),
+      username,
+      bio,
+      profile_picture,
+      theme_preference
+    });
+    
+    const updatedProfile = getUserProfile(parseInt(ref));
+    
+    res.json({
+      success: true,
+      profile: updatedProfile
+    });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    res.status(500).json({ success: false, error: 'Failed to update user profile' });
+  }
+});
+
+// Upload profile picture
+app.post('/api/user-profile/:ref/picture', profilePicUpload.single('picture'), async (req, res) => {
+  try {
+    const { ref } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file provided' });
+    }
+    
+    // Update user profile with new picture path
+    const profile = getUserProfile(parseInt(ref));
+    if (profile) {
+      const picturePath = `/uploads/profile_pics/${req.file.filename}`;
+      createOrUpdateUserProfile({
+        ...profile,
+        profile_picture: picturePath
+      });
+    }
+    
+    res.json({
+      success: true,
+      filename: req.file.filename,
+      path: `/uploads/profile_pics/${req.file.filename}`
+    });
+  } catch (error) {
+    console.error('Error uploading profile picture:', error);
+    res.status(500).json({ success: false, error: 'Failed to upload profile picture' });
   }
 });
 

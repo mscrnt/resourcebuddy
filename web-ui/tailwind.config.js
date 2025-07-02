@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        'art-dark': '#0a0a0a',
-        'art-darker': '#050505',
+        'art-dark': 'var(--color-dark-bg, #0a0a0a)',
+        'art-darker': 'var(--color-dark-bg-secondary, #171717)',
         'art-gray': {
           50: '#f9fafb',
           100: '#f3f4f6',
@@ -18,10 +18,17 @@ export default {
           500: '#6b7280',
           600: '#4b5563',
           700: '#374151',
-          800: '#1f2937',
-          900: '#111827',
+          800: 'var(--color-dark-bg-tertiary, #262626)',
+          900: 'var(--color-dark-bg-secondary, #171717)',
         },
-        'art-accent': '#3b82f6',
+        'art-accent': ({ opacityValue }) => {
+          if (opacityValue !== undefined) {
+            return `rgba(var(--color-accent-rgb, 16 185 129), ${opacityValue})`
+          }
+          return 'rgb(var(--color-accent-rgb, 16 185 129))'
+        },
+        'art-accent-dark': 'var(--color-primary-dark, #059669)',
+        'art-primary': 'var(--color-primary, #10b981)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',

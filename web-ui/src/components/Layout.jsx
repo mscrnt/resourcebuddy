@@ -1,12 +1,14 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Search, Upload, Folder, Star, User, Menu, X, LogOut } from 'lucide-react'
+import { Upload, Folder, Star, User, Menu, X, LogOut, Settings, MoreVertical, Sun, Moon } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '../lib/utils'
 import SearchBar from './SearchBar'
 import useAuthStore from '../stores/useAuthStore'
-import logo from '../assets/logo.png'
+import useSettingsStore from '../stores/useSettingsStore'
+// Logo is now in public directory at /logo.png
 import DragDropOverlay from './DragDropOverlay'
 import UploadModal from './UploadModal'
+import UserProfileModal from './UserProfileModal'
 
 const navigation = [
   { name: 'Home', href: '/', icon: null },
@@ -20,21 +22,107 @@ export default function Layout() {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [uploadFiles, setUploadFiles] = useState([])
+  const [hasAdminPermission, setHasAdminPermission] = useState(false)
+  const [userMetadata, setUserMetadata] = useState(null)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState('dark')
   const { user, logout } = useAuthStore()
+  const { settings, fetchSettings, applyTheme } = useSettingsStore()
   const userMenuRef = useRef(null)
+  const adminMenuRef = useRef(null)
   
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
   
+  const handleThemeToggle = async () => {
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark'
+    setCurrentTheme(newTheme)
+    
+    // Save theme preference to backend
+    if (userMetadata?.ref) {
+      try {
+        await fetch(
+          `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}/api/user-profile/${userMetadata.ref}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...userMetadata,
+              theme_preference: newTheme
+            })
+          }
+        )
+      } catch (error) {
+        console.error('Failed to save theme preference:', error)
+      }
+    }
+    
+    // TODO: Apply theme to UI
+  }
+  
+  // Fetch settings on mount
+  useEffect(() => {
+    fetchSettings().then(() => {
+      applyTheme()
+    })
+  }, [])
+  
+  // Fetch user metadata and check admin permission
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (user?.username && user?.sessionKey) {
+        try {
+          // Fetch user metadata
+          const metadataResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}/api/user-metadata`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user.username })
+          })
+          
+          if (metadataResponse.ok) {
+            const metadataData = await metadataResponse.json()
+            if (metadataData.success) {
+              setUserMetadata(metadataData.user)
+              
+              // Apply user's theme preference
+              if (metadataData.user.theme_preference) {
+                setCurrentTheme(metadataData.user.theme_preference)
+                if (metadataData.user.theme_preference === 'light' && settings.enableLightTheme !== false) {
+                  // TODO: Apply light theme
+                }
+              }
+            }
+          }
+          
+          // Check admin permission
+          const permissionResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}/api/check-permission`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ permission: 'a', sessionKey: user.sessionKey })
+          })
+          const permissionData = await permissionResponse.json()
+          setHasAdminPermission(permissionData.hasPermission)
+        } catch (error) {
+          console.error('Failed to fetch user data:', error)
+        }
+      }
+    }
+    fetchUserData()
+  }, [user, settings.enableLightTheme])
+  
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setUserMenuOpen(false)
+      }
+      if (adminMenuRef.current && !adminMenuRef.current.contains(event.target)) {
+        setAdminMenuOpen(false)
       }
     }
     
@@ -57,8 +145,15 @@ export default function Layout() {
             {/* Logo and Desktop Nav */}
             <div className="flex items-center">
               <Link to="/" className="flex-shrink-0 flex items-center space-x-3">
-                <img src={logo} alt="RS Art Station" className="h-10 w-10" />
-                <h1 className="text-2xl font-bold text-white">RS Art Station</h1>
+                {(settings.logoDarkUrl || settings.logoUrl) ? (
+                  <img 
+                    src={settings.logoDarkUrl || settings.logoUrl || '/logo-dark.png'} 
+                    alt={settings.appTitle || "ResourceBuddy"} 
+                    className="h-14 w-auto object-contain" 
+                  />
+                ) : (
+                  <h1 className="text-2xl font-bold text-white">{settings.appTitle || "ResourceBuddy"}</h1>
+                )}
               </Link>
               
               {/* Desktop Navigation */}
@@ -70,13 +165,13 @@ export default function Layout() {
                       key={item.name}
                       to={item.href}
                       className={cn(
-                        'inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors',
+                        'inline-flex items-center px-1 pt-1 text-xl font-medium transition-colors',
                         isActive
                           ? 'text-white border-b-2 border-art-accent'
                           : 'text-art-gray-400 hover:text-white'
                       )}
                     >
-                      {item.icon && <item.icon className="mr-2 h-4 w-4" />}
+                      {item.icon && <item.icon className="mr-2 h-6 w-6" />}
                       {item.name}
                     </Link>
                   )
@@ -88,26 +183,49 @@ export default function Layout() {
             <div className="flex items-center gap-4">
               <SearchBar />
               
-              {/* User Menu */}
-              <div className="relative" ref={userMenuRef}>
-                <button 
-                  className="flex items-center gap-2 rounded-full p-2 text-art-gray-400 hover:text-white transition-colors"
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+              {/* Theme Toggle */}
+              {settings.enableLightTheme !== false && (
+                <button
+                  onClick={handleThemeToggle}
+                  className="p-2 text-art-gray-400 hover:text-white transition-colors"
+                  title={`Switch to ${currentTheme === 'dark' ? 'light' : 'dark'} mode`}
                 >
-                  <User className="h-5 w-5" />
-                  {user && (
-                    <span className="hidden md:inline text-sm">{user.username}</span>
-                  )}
+                  {currentTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
+              )}
+              
+              {/* User Menu */}
+              <div className="flex items-center gap-2">
+                <div className="relative" ref={userMenuRef}>
+                  <button 
+                    className="flex items-center gap-2 rounded-full p-2 text-art-gray-400 hover:text-white transition-colors"
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  >
+                    <User className="h-5 w-5" />
+                    {userMetadata && (
+                      <span className="hidden md:inline text-sm">{userMetadata.fullname || user.username}</span>
+                    )}
+                  </button>
                 
                 {/* User Dropdown Menu */}
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 rounded-md bg-art-gray-900 py-1 shadow-lg ring-1 ring-black ring-opacity-5">
-                    {user && (
+                    {userMetadata && (
                       <div className="px-4 py-2 text-sm text-art-gray-400 border-b border-art-gray-800">
-                        Signed in as {user.username}
+                        <div className="font-medium text-white">{userMetadata.fullname || user.username}</div>
+                        <div className="text-xs">{user.username}</div>
                       </div>
                     )}
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        setProfileModalOpen(true)
+                      }}
+                      className="flex w-full items-center px-4 py-2 text-sm text-art-gray-300 hover:bg-art-gray-800 hover:text-white"
+                    >
+                      <User className="mr-3 h-4 w-4" />
+                      My Profile
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="flex w-full items-center px-4 py-2 text-sm text-art-gray-300 hover:bg-art-gray-800 hover:text-white"
@@ -115,6 +233,32 @@ export default function Layout() {
                       <LogOut className="mr-3 h-4 w-4" />
                       Sign out
                     </button>
+                  </div>
+                )}
+                </div>
+                
+                {/* Admin Hamburger Menu */}
+                {hasAdminPermission && (
+                  <div className="relative" ref={adminMenuRef}>
+                    <button 
+                      className="p-2 text-art-gray-400 hover:text-white transition-colors"
+                      onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                    >
+                      <MoreVertical className="h-5 w-5" />
+                    </button>
+                    
+                    {adminMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-48 rounded-md bg-art-gray-900 py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+                        <Link
+                          to="/admin"
+                          onClick={() => setAdminMenuOpen(false)}
+                          className="flex w-full items-center px-4 py-2 text-sm text-art-gray-300 hover:bg-art-gray-800 hover:text-white"
+                        >
+                          <Settings className="mr-3 h-4 w-4" />
+                          Admin Panel
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -146,14 +290,14 @@ export default function Layout() {
                     to={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      'block rounded-md px-3 py-2 text-base font-medium transition-colors',
+                      'block rounded-md px-3 py-2 text-lg font-medium transition-colors',
                       isActive
                         ? 'bg-art-gray-800 text-white'
                         : 'text-art-gray-400 hover:bg-art-gray-800 hover:text-white'
                     )}
                   >
                     <span className="flex items-center">
-                      {item.icon && <item.icon className="mr-3 h-5 w-5" />}
+                      {item.icon && <item.icon className="mr-3 h-6 w-6" />}
                       {item.name}
                     </span>
                   </Link>
@@ -189,6 +333,16 @@ export default function Layout() {
           setUploadFiles([])
         }}
         files={uploadFiles}
+      />
+      
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        userMetadata={userMetadata}
+        onProfileUpdate={(updatedData) => {
+          setUserMetadata(updatedData)
+        }}
       />
     </div>
   )

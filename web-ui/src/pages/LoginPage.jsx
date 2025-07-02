@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
 import resourceSpaceApi from '../lib/resourcespace-api-backend'
-import logo from '../assets/logo.png'
 
 const LoginPage = () => {
   const [username, setUsername] = useState('')
@@ -50,9 +49,9 @@ const LoginPage = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <img className="mx-auto h-16 w-16 mb-4" src={logo} alt="RS Art Station" />
+          <img className="mx-auto h-16 w-16 mb-4" src="/favicon-rb.png" alt="ResourceBuddy" />
           <h2 className="text-center text-3xl font-extrabold text-gray-900">
-            Sign in to RS Art Station
+            Sign in to ResourceBuddy
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Access your ResourceSpace media library
