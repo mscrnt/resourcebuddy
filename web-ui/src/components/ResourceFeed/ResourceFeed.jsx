@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import ResourceCard from '../ResourceCard'
 import ResourceTable from '../ResourceTable'
-import ResourceModalEnhanced from '../ResourceModalEnhanced'
 import FloatingSearchBar from './FloatingSearchBar'
 import DashboardTileModal from '../DashboardTileModal'
 import CollectionSelectModal from '../CollectionSelectModal'
@@ -11,6 +10,7 @@ import { cn } from '../../lib/utils'
 import resourceSpaceApi from '../../lib/resourcespace-api-backend'
 import useAuthStore from '../../stores/useAuthStore'
 import useSettingsStore from '../../stores/useSettingsStore'
+import { useResourceModal } from '../../contexts/ResourceModalContext'
 
 const VIEW_MODES = {
   THUMBNAIL: 'thumbnail',
@@ -43,9 +43,7 @@ export default function ResourceFeed({
   const loadMoreRef = useRef(null)
   
   // Modal state
-  const [selectedResource, setSelectedResource] = useState(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(0)
+  const { openResource } = useResourceModal()
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [dashboardTileModalOpen, setDashboardTileModalOpen] = useState(false)
   const [selectedResources, setSelectedResources] = useState(new Set())
@@ -199,9 +197,17 @@ export default function ResourceFeed({
     if (selectionMode || event?.ctrlKey || event?.metaKey) {
       handleResourceSelection(resource.ref, index, event)
     } else {
-      setSelectedResource(resource)
-      setSelectedIndex(index)
-      setModalOpen(true)
+      // Open resource in centralized modal with context
+      openResource(resource, {
+        context: context,
+        resources: resources,
+        currentIndex: index,
+        contextData: {
+          searchParams: { query: searchQuery, filters: advancedFilters },
+          activeCollection: activeCollection,
+          collectionBarHeight: collectionBarHeight
+        }
+      })
     }
   }
   
@@ -396,44 +402,6 @@ export default function ResourceFeed({
         )}
       </div>
       
-      {/* Enhanced Resource Modal */}
-      <ResourceModalEnhanced
-        resource={selectedResource}
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false)
-          setSelectedResource(null)
-        }}
-        onNext={() => {
-          const nextIndex = selectedIndex + 1
-          if (nextIndex < resources.length) {
-            setSelectedIndex(nextIndex)
-            setSelectedResource(resources[nextIndex])
-          }
-        }}
-        onPrevious={() => {
-          const prevIndex = selectedIndex - 1
-          if (prevIndex >= 0) {
-            setSelectedIndex(prevIndex)
-            setSelectedResource(resources[prevIndex])
-          }
-        }}
-        hasNext={selectedIndex < resources.length - 1}
-        hasPrevious={selectedIndex > 0}
-        context={context}
-        searchParams={searchQuery || sortField !== 'date' || sortOrder !== 'desc' ? getCurrentSearchParams() : null}
-        collectionId={activeCollection?.ref}
-        activeCollection={activeCollection}
-        collectionBarHeight={collectionBarHeight}
-        onAddToCollection={(resource) => {
-          // Collection bar will handle refresh
-          console.log('Added to collection:', resource.ref)
-        }}
-        onRemoveFromCollection={(resourceRef) => {
-          // Collection bar will handle refresh
-          console.log('Removed from collection:', resourceRef)
-        }}
-      />
       
       {/* Dashboard Tile Modal */}
       <DashboardTileModal
@@ -464,7 +432,7 @@ export default function ResourceFeed({
             console.log(message)
           }}
           onCollectionChange={setActiveCollection}
-          isModalOpen={modalOpen}
+          isModalOpen={false}
           onHeightChange={setCollectionBarHeight}
         />
       )}

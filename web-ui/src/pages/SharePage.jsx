@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
 import resourceSpaceApi from '../lib/resourcespace-api-backend'
-import ResourceModalEnhanced from '../components/ResourceModalEnhanced'
+import { useResourceModal } from '../contexts/ResourceModalContext'
 
 export default function SharePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { isAuthenticated, sessionKey } = useAuthStore()
-  const [resource, setResource] = useState(null)
+  const { openResource } = useResourceModal()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [accessDenied, setAccessDenied] = useState(false)
@@ -40,7 +40,20 @@ export default function SharePage() {
       
       // Load resource
       const resourceData = await resourceSpaceApi.getResource(resourceId, sessionKey)
-      setResource(resourceData)
+      
+      // Open in modal with share context
+      openResource(resourceData, {
+        context: collectionId ? 'collection' : 'search',
+        resources: [resourceData], // Single resource for share links
+        currentIndex: 0,
+        contextData: {
+          collectionId: collectionId,
+          searchParams: Object.fromEntries(searchParams.entries())
+        }
+      })
+      
+      // Navigate away since modal will handle display
+      handleClose()
       
     } catch (err) {
       console.error('Failed to load shared resource:', err)
@@ -114,26 +127,6 @@ export default function SharePage() {
     return null
   }
   
-  // Build search params for context
-  const contextSearchParams = {}
-  searchParams.forEach((value, key) => {
-    if (key !== 'resource' && key !== 'collection') {
-      contextSearchParams[key] = value
-    }
-  })
-  
-  return (
-    <ResourceModalEnhanced
-      resource={resource}
-      isOpen={true}
-      onClose={handleClose}
-      onNext={() => {}} // No navigation in share view
-      onPrevious={() => {}}
-      hasNext={false}
-      hasPrevious={false}
-      context={collectionId ? 'collection' : 'search'}
-      searchParams={contextSearchParams}
-      collectionId={collectionId}
-    />
-  )
+  // The modal is opened in loadResource, just show loading
+  return null
 }

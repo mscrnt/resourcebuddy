@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, Info, ZoomIn, ZoomOut, Maximize2, Share2,
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '../lib/utils'
 import { useApi } from '../contexts/ApiContext'
+import { useCollectionBar } from '../contexts/CollectionBarContext'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
 import VideoPlayerPro from './VideoPlayerPro'
@@ -23,11 +24,12 @@ export default function ResourceModalEnhanced({
   activeCollection = null,
   onAddToCollection = null,
   onRemoveFromCollection = null,
-  collectionBarHeight = 52
+  collectionBarHeight: propCollectionBarHeight = 52
 }) {
   const api = useApi()
   const navigate = useNavigate()
   const { sessionKey, user } = useAuthStore()
+  const { collectionBarHeight, isCollectionBarVisible } = useCollectionBar()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [mediaUrl, setMediaUrl] = useState(null)
@@ -573,6 +575,9 @@ export default function ResourceModalEnhanced({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm"
+        style={{
+          bottom: isCollectionBarVisible ? `${collectionBarHeight}px` : 0
+        }}
         onClick={(e) => {
           // Only close if clicking the backdrop, not the content
           if (e.target === e.currentTarget) {
@@ -592,10 +597,10 @@ export default function ResourceModalEnhanced({
                 animate={{ x: 0 }}
                 exit={{ x: -metadataWidth }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="relative bg-art-gray-900/95 backdrop-blur-sm border-r border-art-gray-800 overflow-y-auto flex-shrink-0 shadow-2xl"
+                className="relative bg-art-gray-900/95 backdrop-blur-sm border-r border-art-gray-800 overflow-hidden flex-shrink-0 shadow-2xl"
                 style={{ 
                   width: `${metadataWidth}px`,
-                  height: activeCollection ? `calc(100vh - ${collectionBarHeight || 52}px)` : '100vh'
+                  height: '100%'
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -615,7 +620,7 @@ export default function ResourceModalEnhanced({
                 </button>
 
                 <div className={cn(
-                  "pt-12 px-4 pb-4 h-full overflow-y-auto",
+                  "pt-12 px-4 pb-6 h-full overflow-y-auto",
                   metadataWidth > 400 ? "px-6" : "px-4"
                 )}>
                   {/* Resource Type */}
@@ -965,7 +970,7 @@ export default function ResourceModalEnhanced({
               className="absolute inset-0 flex items-center justify-center"
               style={{
                 top: isImageFullscreen ? 0 : '45px',
-                bottom: activeCollection && !isImageFullscreen ? `${collectionBarHeight || 52}px` : 0,
+                bottom: 0,
                 left: 0,
                 right: 0,
                 padding: 0
@@ -1017,8 +1022,8 @@ export default function ResourceModalEnhanced({
                         src={mediaUrl}
                         alt={resource.field8 || 'Resource preview'}
                         isFullscreen={isImageFullscreen}
-                        availableHeight={availableSpace.height}
-                        availableWidth={availableSpace.width}
+                        availableHeight={window.innerHeight - (isImageFullscreen ? 0 : (45 + (isCollectionBarVisible ? collectionBarHeight : 0)))}
+                        availableWidth={window.innerWidth - (showMetadata && !isImageFullscreen ? metadataWidth : 0)}
                       />
                     )}
                   </div>

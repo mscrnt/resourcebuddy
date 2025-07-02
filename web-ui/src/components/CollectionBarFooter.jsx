@@ -8,7 +8,8 @@ import { cn } from '../lib/utils'
 import { useNavigate } from 'react-router-dom'
 import resourceSpaceApi from '../lib/resourcespace-api-backend'
 import { useApi } from '../contexts/ApiContext'
-import ResourceModalEnhanced from './ResourceModalEnhanced'
+import { useResourceModal } from '../contexts/ResourceModalContext'
+import { useCollectionBar } from '../contexts/CollectionBarContext'
 
 // Collection Dropdown Component
 function CollectionDropdown({ collections, collection, onSelect, onCreate, searchQuery, onSearchChange, searchResults, searchLoading, searchInputRef }) {
@@ -348,8 +349,8 @@ export default function CollectionBarFooter({
   const [startY, setStartY] = useState(0)
   const [startHeight, setStartHeight] = useState(0)
   const [activePopover, setActivePopover] = useState(null)
-  const [selectedResourceForModal, setSelectedResourceForModal] = useState(null)
-  const [modalOpen, setModalOpen] = useState(false)
+  const { openResource } = useResourceModal()
+  const { setCollectionBarHeight, setIsCollectionBarVisible } = useCollectionBar()
   const [collectionSearchQuery, setCollectionSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [searchLoading, setSearchLoading] = useState(false)
@@ -637,8 +638,20 @@ export default function CollectionBarFooter({
 
   const handleResourceOpen = (resource) => {
     setActivePopover(null)
-    setSelectedResourceForModal(resource)
-    setModalOpen(true)
+    const resourceIndex = resources.findIndex(r => r.ref === resource.ref)
+    openResource(resource, {
+      context: 'collection',
+      resources: resources,
+      currentIndex: resourceIndex >= 0 ? resourceIndex : 0,
+      contextData: {
+        collectionId: collection?.ref,
+        activeCollection: collection,
+        collectionBarHeight: panelHeight,
+        onRemoveFromCollection: (resourceRef) => {
+          handleRemoveResource(resourceRef)
+        }
+      }
+    })
   }
 
   // Search collections with debounce
@@ -750,9 +763,28 @@ export default function CollectionBarFooter({
 
   // Check if collection bar is enabled
   const isEnabled = getSetting('enableCollectionBar') !== false
-  if (!isEnabled) return null
-
+  
+  // Calculate current height
   const currentHeight = showThumbs ? panelHeight : COMPACT_HEIGHT
+  
+  // Update context whenever height or visibility changes
+  useEffect(() => {
+    if (isEnabled) {
+      setCollectionBarHeight(currentHeight)
+      setIsCollectionBarVisible(true)
+    } else {
+      setIsCollectionBarVisible(false)
+    }
+  }, [currentHeight, isEnabled, setCollectionBarHeight, setIsCollectionBarVisible])
+  
+  // Also notify through callback if provided
+  useEffect(() => {
+    if (onHeightChange && isEnabled) {
+      onHeightChange(currentHeight)
+    }
+  }, [currentHeight, onHeightChange, isEnabled])
+  
+  if (!isEnabled) return null
 
   return createPortal(
     <>
@@ -1158,33 +1190,6 @@ export default function CollectionBarFooter({
         </div>
       )}
       
-      {/* Resource Modal */}
-      <ResourceModalEnhanced
-        resource={selectedResourceForModal}
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false)
-          setSelectedResourceForModal(null)
-        }}
-        onNext={() => {
-          const currentIndex = resources.findIndex(r => r.ref === selectedResourceForModal?.ref)
-          if (currentIndex < resources.length - 1) {
-            setSelectedResourceForModal(resources[currentIndex + 1])
-          }
-        }}
-        onPrevious={() => {
-          const currentIndex = resources.findIndex(r => r.ref === selectedResourceForModal?.ref)
-          if (currentIndex > 0) {
-            setSelectedResourceForModal(resources[currentIndex - 1])
-          }
-        }}
-        hasNext={selectedResourceForModal && resources.findIndex(r => r.ref === selectedResourceForModal.ref) < resources.length - 1}
-        hasPrevious={selectedResourceForModal && resources.findIndex(r => r.ref === selectedResourceForModal.ref) > 0}
-        context="collection"
-        collectionId={collection?.ref}
-        activeCollection={collection}
-        collectionBarHeight={showThumbs ? panelHeight : COMPACT_HEIGHT}
-      />
     </>,
     document.body
   )
