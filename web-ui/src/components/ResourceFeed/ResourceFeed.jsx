@@ -42,6 +42,11 @@ export default function ResourceFeed({
   const observerRef = useRef(null)
   const loadMoreRef = useRef(null)
   
+  // Update search query when initialQuery prop changes
+  useEffect(() => {
+    setSearchQuery(initialQuery)
+  }, [initialQuery])
+  
   // Modal state
   const { openResource } = useResourceModal()
   const [configModalOpen, setConfigModalOpen] = useState(false)

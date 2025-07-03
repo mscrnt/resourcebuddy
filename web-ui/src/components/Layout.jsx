@@ -159,7 +159,17 @@ export default function Layout() {
           <div className="flex h-16 items-center justify-between">
             {/* Logo and Desktop Nav */}
             <div className="flex items-center">
-              <Link to="/" className="flex-shrink-0 flex items-center space-x-3">
+              <Link 
+                to="/" 
+                className="flex-shrink-0 flex items-center space-x-3"
+                onClick={(e) => {
+                  // Clear search params when clicking logo
+                  if (location.pathname === '/' && window.location.search) {
+                    e.preventDefault()
+                    navigate('/', { replace: true })
+                  }
+                }}
+              >
                 {(settings.logoDarkUrl || settings.logoUrl) ? (
                   <img 
                     src={settings.logoDarkUrl || settings.logoUrl || '/logo-dark.png'} 
@@ -180,6 +190,13 @@ export default function Layout() {
                     <Link
                       key={item.name}
                       to={item.href}
+                      onClick={(e) => {
+                        // Clear search params when clicking Browse
+                        if (item.href === '/' && location.pathname === '/' && window.location.search) {
+                          e.preventDefault()
+                          navigate('/', { replace: true })
+                        }
+                      }}
                       className={cn(
                         'inline-flex items-center px-1 pt-1 text-xl font-medium transition-colors relative',
                         isActive
@@ -308,7 +325,14 @@ export default function Layout() {
                   <Link
                     key={item.name}
                     to={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={(e) => {
+                      setMobileMenuOpen(false)
+                      // Clear search params when clicking Browse
+                      if (item.href === '/' && location.pathname === '/' && window.location.search) {
+                        e.preventDefault()
+                        navigate('/', { replace: true })
+                      }
+                    }}
                     className={cn(
                       'block rounded-md px-3 py-2 text-lg font-medium transition-colors',
                       isActive

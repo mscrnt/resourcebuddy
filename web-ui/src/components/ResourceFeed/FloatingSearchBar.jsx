@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '../../lib/utils'
+import { X, Search } from 'lucide-react'
 import useAuthStore from '../../stores/useAuthStore'
-import AdvancedSearchModal from '../AdvancedSearchModal/index'
+import GuidedSearchModal from '../GuidedSearchModal'
 import ExpandableFiltersPanel from './ExpandableFiltersPanel'
 import resourceSpaceApi from '../../lib/resourcespace-api-backend'
 
@@ -258,17 +259,39 @@ export default function FloatingSearchBar({
           <form onSubmit={handleSearchSubmit} className="space-y-4">
             {/* Search Bar */}
             <div className="flex items-center gap-4">
-                <div className="flex-1 flex items-center gap-4">
+                <div className="flex-1 flex items-center gap-2">
                   <div className="flex-1 relative">
                     <input
                       type="text"
                       value={searchValue}
                       onChange={(e) => setSearchValue(e.target.value)}
                       placeholder="Search resources..."
-                      className="w-full pl-10 pr-4 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="w-full pl-4 pr-10 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
-                    <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-art-gray-400"></i>
+                    {/* Clear button inside input */}
+                    {searchValue && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchValue('')
+                          onSearch('')
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-art-gray-400 hover:text-white transition-colors"
+                        aria-label="Clear search"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
+                  
+                  {/* Search button outside input */}
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-art-accent text-white rounded-lg hover:bg-art-accent-dark transition-colors flex items-center gap-2"
+                    aria-label="Search"
+                  >
+                    <Search className="h-5 w-5" />
+                  </button>
 
                   {/* Sort Dropdown */}
                   <div className="relative group">
@@ -451,12 +474,13 @@ export default function FloatingSearchBar({
         )}
       </div>
       
-      {/* Advanced Search Modal */}
-      <AdvancedSearchModal
+      {/* Guided Search Modal */}
+      <GuidedSearchModal
         isOpen={showAdvancedModal}
         onClose={() => setShowAdvancedModal(false)}
         onSearch={handleAdvancedSearch}
         initialFilters={advancedFilters}
+        mode="guided"
       />
     </div>
   )

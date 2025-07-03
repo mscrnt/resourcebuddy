@@ -302,6 +302,30 @@ export const resourceSpaceApi = {
     }, sessionKey)
   },
 
+  /**
+   * Perform a search and return matching resources
+   * @param {string} search - The search string in ResourceSpace format
+   * @param {string} restypes - Resource type IDs to include (e.g., "1,2")
+   * @param {string} orderBy - Order results by: relevance, popularity, rating, date, colour, country, title, file_path, resourceid, resourcetype, titleandcountry, random, status
+   * @param {number} archive - Archive status: 0=active, 1=pending archive, 2=archived, 3=deleted, -1=pending review, -2=pending submission
+   * @param {string|number} fetchrows - Max rows to return, or "offset,limit" for pagination
+   * @param {string} sort - Sort order: "asc" or "desc"
+   * @param {number} offset - Starting offset for results (deprecated if using fetchrows with comma)
+   * @param {string|null} sessionKey - Session key for authenticated requests
+   * @returns {Promise<Array|Object>} Array of resources or object with {total, data} if using offset,limit
+   */
+  doSearch: async (search = '', restypes = '', orderBy = 'relevance', archive = 0, fetchrows = -1, sort = 'desc', offset = 0, sessionKey = null) => {
+    return resourceSpaceApi.apiCall('do_search', {
+      param1: search,
+      param2: restypes,
+      param3: orderBy,
+      param4: archive,
+      param5: fetchrows,
+      param6: sort,
+      param7: offset
+    }, sessionKey)
+  },
+
   // Get all resource types
   getResourceTypes: async (sessionKey = null) => {
     return resourceSpaceApi.apiCall('get_resource_types', {}, sessionKey)
