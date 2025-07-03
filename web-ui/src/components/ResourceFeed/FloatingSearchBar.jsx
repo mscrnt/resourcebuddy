@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '../../lib/utils'
 import useAuthStore from '../../stores/useAuthStore'
+import AdvancedSearchModal from '../AdvancedSearchModal/index'
+import ExpandableFiltersPanel from './ExpandableFiltersPanel'
+import resourceSpaceApi from '../../lib/resourcespace-api-backend'
 
 const SORT_OPTIONS = [
   { value: 'date', label: 'Date Added', icon: 'fa-calendar' },
@@ -39,22 +42,40 @@ export default function FloatingSearchBar({
   onClearSelection,
   onAddToCollection
 }) {
-  const { user } = useAuthStore()
+  const { user, sessionKey } = useAuthStore()
   const [searchValue, setSearchValue] = useState(initialQuery)
   const [advancedFilters, setAdvancedFilters] = useState({
+    allWords: '',
+    phrase: '',
+    anyWords: '',
+    withoutWords: '',
+    resourceTypes: [],
+    dateFrom: '',
+    dateTo: '',
     title: '',
     description: '',
-    contributor: '',
-    field1: '',
-    field8: '',
+    keywords: '',
+    creator: '',
+    country: '',
+    originalFilename: '',
+    fileExtension: '',
     operator: 'AND'
   })
+  const [showAdvancedModal, setShowAdvancedModal] = useState(false)
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false)
+  const [filtersPanelExpanded, setFiltersPanelExpanded] = useState(false)
+  const [resourceTypes, setResourceTypes] = useState([])
   const [actionsOpen, setActionsOpen] = useState(false)
   const actionsRef = useRef(null)
 
   useEffect(() => {
     setSearchValue(initialQuery)
   }, [initialQuery])
+
+  // Load resource types
+  useEffect(() => {
+    loadResourceTypes()
+  }, [])
 
   // Close actions dropdown when clicking outside
   useEffect(() => {
@@ -68,13 +89,135 @@ export default function FloatingSearchBar({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const loadResourceTypes = async () => {
+    try {
+      const types = await resourceSpaceApi.getResourceTypes(sessionKey)
+      setResourceTypes(types || [])
+    } catch (err) {
+      console.error('Failed to load resource types:', err)
+    }
+  }
+
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    if (advancedMode) {
-      onAdvancedSearch(advancedFilters)
-    } else {
-      onSearch(searchValue)
+    onSearch(searchValue)
+  }
+
+  const handleAdvancedSearch = (searchData) => {
+    // Set the search value
+    setSearchValue(searchData.query)
+    
+    // Update filters
+    setAdvancedFilters(searchData.filters)
+    
+    // Show filters panel if there are active filters
+    const hasActiveFilters = Object.entries(searchData.filters).some(([key, value]) => {
+      if (key === 'operator') return false
+      if (key === 'resourceTypes') return value.length > 0
+      return value && value !== ''
+    })
+    
+    if (hasActiveFilters) {
+      setShowFiltersPanel(true)
+      setFiltersPanelExpanded(false)
     }
+    
+    // Perform search
+    onSearch(searchData.query)
+    if (onAdvancedSearch) {
+      onAdvancedSearch(searchData.filters)
+    }
+  }
+
+  const handleFiltersChange = (newFilters) => {
+    setAdvancedFilters(newFilters)
+    
+    // Rebuild search query from filters
+    let searchParts = []
+    
+    if (newFilters.allWords) {
+      searchParts.push(newFilters.allWords.split(' ').map(w => `+${w}`).join(' '))
+    }
+    
+    if (newFilters.phrase) {
+      searchParts.push(`"${newFilters.phrase}"`)
+    }
+    
+    if (newFilters.anyWords) {
+      searchParts.push(newFilters.anyWords)
+    }
+    
+    if (newFilters.withoutWords) {
+      searchParts.push(newFilters.withoutWords.split(' ').map(w => `-${w}`).join(' '))
+    }
+    
+    if (newFilters.title) {
+      searchParts.push(`title:"${newFilters.title}"`)
+    }
+    
+    if (newFilters.description) {
+      searchParts.push(`description:"${newFilters.description}"`)
+    }
+    
+    if (newFilters.keywords) {
+      searchParts.push(`keywords:${newFilters.keywords}`)
+    }
+    
+    if (newFilters.creator) {
+      searchParts.push(`creator:"${newFilters.creator}"`)
+    }
+    
+    if (newFilters.country) {
+      searchParts.push(`country:"${newFilters.country}"`)
+    }
+    
+    if (newFilters.originalFilename) {
+      searchParts.push(`filename:"${newFilters.originalFilename}"`)
+    }
+    
+    if (newFilters.fileExtension) {
+      searchParts.push(`extension:${newFilters.fileExtension}`)
+    }
+    
+    if (newFilters.dateFrom || newFilters.dateTo) {
+      if (newFilters.dateFrom && newFilters.dateTo) {
+        searchParts.push(`date:${newFilters.dateFrom}..${newFilters.dateTo}`)
+      } else if (newFilters.dateFrom) {
+        searchParts.push(`date:>=${newFilters.dateFrom}`)
+      } else if (newFilters.dateTo) {
+        searchParts.push(`date:<=${newFilters.dateTo}`)
+      }
+    }
+    
+    const searchQuery = searchParts.join(newFilters.operator === 'OR' ? ' OR ' : ' ')
+    setSearchValue(searchQuery)
+    onSearch(searchQuery)
+    if (onAdvancedSearch) {
+      onAdvancedSearch(newFilters)
+    }
+  }
+
+  const handleClearFilters = () => {
+    setAdvancedFilters({
+      allWords: '',
+      phrase: '',
+      anyWords: '',
+      withoutWords: '',
+      resourceTypes: [],
+      dateFrom: '',
+      dateTo: '',
+      title: '',
+      description: '',
+      keywords: '',
+      creator: '',
+      country: '',
+      originalFilename: '',
+      fileExtension: '',
+      operator: 'AND'
+    })
+    setShowFiltersPanel(false)
+    setSearchValue('')
+    onSearch('')
   }
 
   const handleSortChange = (field) => {
@@ -85,9 +228,6 @@ export default function FloatingSearchBar({
     }
   }
 
-  const handleFilterChange = (field, value) => {
-    setAdvancedFilters(prev => ({ ...prev, [field]: value }))
-  }
 
   const currentSortOption = SORT_OPTIONS.find(opt => opt.value === sortField)
 
@@ -116,9 +256,8 @@ export default function FloatingSearchBar({
         {/* Search Bar */}
         <div className="py-4">
           <form onSubmit={handleSearchSubmit} className="space-y-4">
-            {/* Simple Search */}
-            {!advancedMode ? (
-              <div className="flex items-center gap-4">
+            {/* Search Bar */}
+            <div className="flex items-center gap-4">
                 <div className="flex-1 flex items-center gap-4">
                   <div className="flex-1 relative">
                     <input
@@ -182,14 +321,14 @@ export default function FloatingSearchBar({
                     ))}
                   </div>
 
-                  {/* Advanced Toggle */}
+                  {/* Advanced Search Button */}
                   <button
                     type="button"
-                    onClick={onToggleAdvanced}
-                    className="px-4 py-2 text-art-gray-400 hover:text-white transition-colors"
-                    title="Advanced Search"
+                    onClick={() => setShowAdvancedModal(true)}
+                    className="px-4 py-2 bg-art-gray-800 text-white rounded-lg hover:bg-art-gray-700 transition-colors flex items-center gap-2"
                   >
-                    <i className="fas fa-sliders-h"></i>
+                    <i className="fas fa-search-plus"></i>
+                    <span className="hidden sm:inline">Advanced Search</span>
                   </button>
 
                   {/* Actions Dropdown */}
@@ -296,114 +435,29 @@ export default function FloatingSearchBar({
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Advanced Search */
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-white">Advanced Search</h3>
-                  <button
-                    type="button"
-                    onClick={onToggleAdvanced}
-                    className="text-art-gray-400 hover:text-white transition-colors"
-                  >
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-art-gray-400 mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={advancedFilters.title}
-                      onChange={(e) => handleFilterChange('title', e.target.value)}
-                      className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-art-gray-400 mb-1">Description</label>
-                    <input
-                      type="text"
-                      value={advancedFilters.description}
-                      onChange={(e) => handleFilterChange('description', e.target.value)}
-                      className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-art-gray-400 mb-1">Contributor</label>
-                    <input
-                      type="text"
-                      value={advancedFilters.contributor}
-                      onChange={(e) => handleFilterChange('contributor', e.target.value)}
-                      className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-art-gray-400 mb-1">Keywords (Field 1)</label>
-                    <input
-                      type="text"
-                      value={advancedFilters.field1}
-                      onChange={(e) => handleFilterChange('field1', e.target.value)}
-                      className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-art-gray-400 mb-1">Caption (Field 8)</label>
-                    <input
-                      type="text"
-                      value={advancedFilters.field8}
-                      onChange={(e) => handleFilterChange('field8', e.target.value)}
-                      className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-art-gray-400 mb-1">Operator</label>
-                    <select
-                      value={advancedFilters.operator}
-                      onChange={(e) => handleFilterChange('operator', e.target.value)}
-                      className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
-                    >
-                      <option value="AND">AND (all conditions)</option>
-                      <option value="OR">OR (any condition)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdvancedFilters({
-                        title: '',
-                        description: '',
-                        contributor: '',
-                        field1: '',
-                        field8: '',
-                        operator: 'AND'
-                      })
-                    }}
-                    className="px-4 py-2 text-art-gray-400 hover:text-white transition-colors"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-2 bg-art-accent text-white rounded-lg hover:bg-art-accent-dark transition-colors"
-                  >
-                    <i className="fas fa-search mr-2"></i>
-                    Search
-                  </button>
-                </div>
-              </div>
-            )}
           </form>
         </div>
+        
+        {/* Expandable Filters Panel */}
+        {showFiltersPanel && (
+          <ExpandableFiltersPanel
+            filters={advancedFilters}
+            onChange={handleFiltersChange}
+            onClear={handleClearFilters}
+            isExpanded={filtersPanelExpanded}
+            onToggleExpand={() => setFiltersPanelExpanded(!filtersPanelExpanded)}
+            resourceTypes={resourceTypes}
+          />
+        )}
       </div>
+      
+      {/* Advanced Search Modal */}
+      <AdvancedSearchModal
+        isOpen={showAdvancedModal}
+        onClose={() => setShowAdvancedModal(false)}
+        onSearch={handleAdvancedSearch}
+        initialFilters={advancedFilters}
+      />
     </div>
   )
 }

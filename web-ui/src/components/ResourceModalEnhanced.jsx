@@ -426,8 +426,34 @@ export default function ResourceModalEnhanced({
 
   // Search by metadata value
   const searchByMetadataValue = (field, value) => {
+    // Clean the value - remove extra whitespace
+    const cleanValue = value.trim()
+    
+    // For keyword/tag fields, search without field name for broader results
+    const keywordFields = ['keywords', 'tags', 'subject', 'category']
+    const isKeywordField = keywordFields.some(kf => field.name?.toLowerCase().includes(kf))
+    
+    // For multi-value fields (separated by comma or semicolon), pick just the clicked value
+    let searchValue = cleanValue
+    if (cleanValue.includes(',') || cleanValue.includes(';')) {
+      // This might be a multi-value field, but we're searching for the whole value for now
+      // In future, we could parse individual tags
+      searchValue = cleanValue
+    }
+    
+    // Build search query
+    let searchQuery
+    if (isKeywordField) {
+      // For keyword fields, just search the value directly
+      searchQuery = searchValue
+    } else {
+      // For other fields, use field-specific search
+      // Escape quotes in the value
+      const escapedValue = searchValue.replace(/"/g, '\\"')
+      searchQuery = `${field.name}:"${escapedValue}"`
+    }
+    
     // Navigate to browse page with search filter
-    const searchQuery = `${field.name}:"${value}"`
     navigate(`/?search=${encodeURIComponent(searchQuery)}`)
     onClose()
   }
@@ -713,9 +739,12 @@ export default function ResourceModalEnhanced({
                               </div>
                             ) : (
                               <p 
-                                className="text-white text-sm cursor-pointer hover:text-art-accent transition-colors"
+                                className={cn(
+                                  "text-white text-sm transition-colors",
+                                  field.value && "cursor-pointer hover:text-art-accent hover:underline"
+                                )}
                                 onClick={() => field.value && searchByMetadataValue(field, field.value)}
-                                title={`Search for "${field.value}"`}
+                                title={field.value ? `Click to search for "${field.value}"` : undefined}
                               >
                                 {field.value || '-'}
                               </p>

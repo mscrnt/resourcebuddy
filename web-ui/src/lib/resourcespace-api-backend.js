@@ -282,6 +282,18 @@ export const resourceSpaceApi = {
     }, sessionKey)
   },
 
+  // Get nodes for a field with search
+  getNodes: async (fieldId, parent = null, recursive = false, offset = 0, limit = 50, query = '', sessionKey = null) => {
+    return resourceSpaceApi.apiCall('get_nodes', {
+      param1: fieldId,
+      param2: parent,
+      param3: recursive,
+      param4: offset,
+      param5: limit,
+      param6: query
+    }, sessionKey)
+  },
+
   // Add resource nodes (for fixed list fields)
   addResourceNodes: async (resourceId, nodeIds, sessionKey = null) => {
     return resourceSpaceApi.apiCall('add_resource_nodes', {
