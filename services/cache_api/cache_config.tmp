@@ -1,0 +1,11 @@
+{
+  "media_cache_ttl_days": 7,
+  "redis_enabled": false,
+  "max_cache_size_mb": 10240,
+  "cleanup_interval_hours": 6,
+  "redis_ttl_seconds": 3600,
+  "_metadata": {
+    "updated_at": "2025-07-04T03:32:39.616923",
+    "version": "1.0"
+  }
+}

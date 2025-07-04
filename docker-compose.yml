@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  # Redis cache service (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: rs-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
   # RS Art Station Frontend (Development mode with hot reload)
   rs-art-station:
     image: node:20-alpine
@@ -47,11 +63,17 @@ services:
     volumes:
       - rs_cache_volume:/app/cache
       - ./services/cache_api:/app
+      - ./services/cache_api/cache_config.json:/app/cache_config.json
     env_file:
       - ./backend/.env
     environment:
       - CACHE_DIR=/app/cache
       - CACHE_TTL_DAYS=7
+      - REDIS_ENABLED=true
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -62,3 +84,5 @@ services:
 volumes:
   rs_cache_volume:
     name: rs_cache_volume
+  redis_data:
+    name: rs_redis_data

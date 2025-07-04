@@ -426,7 +426,7 @@ class ResourceSpaceCache:
             file_size = local_path.stat().st_size
             file_hash = self._calculate_file_hash(local_path)
             
-            # Store in database
+            # Store in database with current TTL
             expires_at = datetime.now() + self.default_ttl
             
             with self._get_connection() as conn:
@@ -446,12 +446,13 @@ class ResourceSpaceCache:
                 local_path.unlink()  # Clean up partial download
             return None
     
-    def evict_cached_files(self, force: bool = False) -> Tuple[int, int]:
+    def evict_cached_files(self, force: bool = False, max_cache_size_mb: Optional[int] = None) -> Tuple[int, int]:
         """
         Remove expired cached files
         
         Args:
             force: If True, remove all files regardless of expiry
+            max_cache_size_mb: Maximum cache size in MB, if exceeded, remove oldest files
             
         Returns:
             Tuple of (files_removed, bytes_freed)
@@ -484,6 +485,41 @@ class ResourceSpaceCache:
                 # Remove from database
                 conn.execute("DELETE FROM cached_files WHERE resource_id = ?", 
                            (row['resource_id'],))
+                           
+            # Check if we need to remove more files due to size constraints
+            if max_cache_size_mb:
+                max_cache_bytes = max_cache_size_mb * 1024 * 1024
+                
+                # Get current cache size
+                cursor = conn.execute("SELECT SUM(file_size) as total_size FROM cached_files")
+                current_size = cursor.fetchone()['total_size'] or 0
+                
+                if current_size > max_cache_bytes:
+                    # Remove oldest files until we're under the limit
+                    cursor = conn.execute("""
+                        SELECT resource_id, file_path, file_size 
+                        FROM cached_files
+                        ORDER BY last_fetched ASC
+                    """)
+                    
+                    for row in cursor:
+                        if current_size <= max_cache_bytes:
+                            break
+                            
+                        file_path = Path(row['file_path'])
+                        if file_path.exists():
+                            try:
+                                file_size = file_path.stat().st_size
+                                file_path.unlink()
+                                files_removed += 1
+                                bytes_freed += file_size
+                                current_size -= file_size
+                                
+                                # Remove from database
+                                conn.execute("DELETE FROM cached_files WHERE resource_id = ?", 
+                                           (row['resource_id'],))
+                            except Exception as e:
+                                logger.error(f"Failed to remove file {file_path}: {e}")
                            
         logger.info(f"Evicted {files_removed} cached files, freed {bytes_freed:,} bytes")
         return files_removed, bytes_freed

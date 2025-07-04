@@ -3,7 +3,7 @@ Configuration for ResourceSpace Cache API
 """
 
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -20,8 +20,19 @@ class Settings(BaseSettings):
     MAX_CACHE_SIZE_GB: float = 10.0
     MIN_FREE_SPACE_GB: float = 5.0
     
+    # Redis settings
+    REDIS_ENABLED: bool = False
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_TTL_SECONDS: int = 3600  # 1 hour for hot cache
+    
     # Cleanup settings
     CLEANUP_INTERVAL_HOURS: int = 6
+    
+    # Admin settings
+    CONFIG_FILE_PATH: str = "/app/config/cache_config.json"
     
     # CORS settings
     CORS_ORIGINS: List[str] = [

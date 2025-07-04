@@ -34,7 +34,8 @@ class ResourceSpaceWrapper:
                  api_key: str,
                  cache_dir: str = "cache",
                  cache_ttl_days: int = 7,
-                 rs_user: str = "admin"):
+                 rs_user: str = "admin",
+                 redis_cache=None):
         """
         Initialize the wrapper
         
@@ -44,10 +45,12 @@ class ResourceSpaceWrapper:
             cache_dir: Directory for cached files
             cache_ttl_days: Default cache TTL in days
             rs_user: ResourceSpace username
+            redis_cache: Optional Redis cache instance
         """
         self.api_url = api_url
         self.api_key = api_key
         self.rs_user = rs_user
+        self.redis_cache = redis_cache
         self.cache = ResourceSpaceCache(
             cache_dir=cache_dir,
             default_ttl_days=cache_ttl_days,
@@ -142,11 +145,25 @@ class ResourceSpaceWrapper:
         """
         Get resource with caching (async version)
         """
-        # First try sync cache check
+        # First check Redis if enabled
+        if self.redis_cache and self.redis_cache.enabled:
+            redis_data = await self.redis_cache.get_resource(resource_id)
+            if redis_data:
+                logger.info(f"Redis hit for resource {resource_id}")
+                # For lightweight metadata, return immediately
+                if not fetch_file:
+                    redis_data['_from_cache'] = True
+                    redis_data['_from_redis'] = True
+                    return redis_data
+                    
+        # Then try sync SQLite cache check
         loop = asyncio.get_event_loop()
         cached = await loop.run_in_executor(thread_pool, self.get_resource, resource_id, fetch_file)
         
         if cached:
+            # Update Redis if we got from SQLite
+            if self.redis_cache and self.redis_cache.enabled:
+                await self.redis_cache.set_resource(resource_id, cached)
             return cached
             
         # Fetch from API
@@ -222,6 +239,11 @@ class ResourceSpaceWrapper:
                 
         # Mark as not from cache (freshly fetched)
         resource_data['_from_cache'] = False
+        
+        # Update Redis if enabled
+        if self.redis_cache and self.redis_cache.enabled:
+            await self.redis_cache.set_resource(resource_id, resource_data)
+            
         return resource_data
         
     def search_resources(self, search: str, 
@@ -330,8 +352,11 @@ class ResourceSpaceWrapper:
             
         return view_data
         
-    def cleanup_cache(self, force: bool = False) -> Dict[str, Any]:
+    def cleanup_cache(self, force: bool = False, max_cache_size_mb: Optional[int] = None) -> Dict[str, Any]:
         """Clean up expired cache entries"""
+        # Pass max cache size to eviction if provided
+        if max_cache_size_mb:
+            self.cache.evict_cached_files(force=force, max_cache_size_mb=max_cache_size_mb)
         return self.cache.evict_stale_entries(force=force)
         
     def get_cache_stats(self) -> Dict[str, Any]:
