@@ -159,17 +159,19 @@ export default function ResourceModalEnhanced({
     try {
       const resData = resourceInfo || resourceData || resource
       const resType = getMediaType(resData)
+      // Handle both ref and resource_id
+      const resourceId = resData.ref || resData.resource_id
       
       if (resType === 'video') {
         // For videos, we need to get the actual video file URL, not a preview
         // Use empty size parameter to get the original file
         // Try to get extension from various possible fields
         const extension = resData.file_extension || resData.fileextension || resData.field53 || 'mp4'
-        const url = await api.getResourcePath(resData.ref, '', true, extension)
+        const url = await api.getResourcePath(resourceId, '', true, extension)
         setMediaUrl(url)
       } else {
         // For images, get the screen size preview
-        const url = await api.getResourcePath(resData.ref, 'scr')
+        const url = await api.getResourcePath(resourceId, 'scr')
         setMediaUrl(url)
       }
     } catch (err) {

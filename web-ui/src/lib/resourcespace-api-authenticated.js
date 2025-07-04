@@ -39,6 +39,7 @@ const resourceSpaceApiAuthenticated = {
 
   getResourcePath: async (ref, size = '', forceOriginal = false, extension = null) => {
     const sessionKey = useAuthStore.getState().getCredentials()?.sessionKey
+    // Note: backend expects sessionKey as 3rd param
     return resourceSpaceApi.getResourcePath(ref, size, sessionKey, forceOriginal, extension)
   },
 

@@ -31,6 +31,34 @@ services:
       - /app/backend/node_modules
     environment:
       - NODE_ENV=development
+      - CACHE_API_URL=http://cache_api:8000
     command: sh -c "npm install && npm start"
     env_file:
       - ./backend/.env
+    depends_on:
+      - cache_api
+
+  # ResourceSpace Cache API Service
+  cache_api:
+    build: ./services/cache_api
+    container_name: rs-cache-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - rs_cache_volume:/app/cache
+      - ./services/cache_api:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - CACHE_DIR=/app/cache
+      - CACHE_TTL_DAYS=7
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  rs_cache_volume:
+    name: rs_cache_volume

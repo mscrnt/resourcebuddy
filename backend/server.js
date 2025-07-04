@@ -13,6 +13,16 @@ const {
   getUserDashboardTiles, getDashboardTile, createDashboardTile,
   updateDashboardTile, deleteDashboardTile, updateTilePositions
 } = require('./database');
+const {
+  checkCacheHealth,
+  getCachedResource,
+  getCachedFile,
+  getCachedPreview,
+  searchWithCache,
+  prefetchResources,
+  getCacheStats,
+  evictResource
+} = require('./cache-integration');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,6 +42,23 @@ app.use('/uploads/profile_pics', express.static(path.join(__dirname, 'uploads/pr
 // Test endpoint
 app.get('/test', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is working!' });
+});
+
+// Debug endpoint to test URL generation
+app.get('/debug/test-url/:ref', (req, res) => {
+  const { ref } = req.params;
+  const { size = 'scr' } = req.query;
+  
+  const imageUrl = `http://localhost:3003/api/resource/${ref}/preview?size=${size}`;
+  const fileUrl = `http://localhost:3003/api/resource/${ref}/file`;
+  
+  res.json({
+    ref,
+    size,
+    imageUrl,
+    fileUrl,
+    testImage: `http://localhost:3003/api/resource/153/preview?size=thm`
+  });
 });
 
 // ResourceSpace configuration from environment
@@ -121,10 +148,52 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Generic API proxy endpoint
+// Generic API proxy endpoint with cache integration
 app.post('/api/proxy', async (req, res) => {
   try {
     const { function: fn, params = {}, sessionKey } = req.body;
+    
+    // Check if we can use cache for certain functions
+    if (fn === 'do_search' && params.param1) {
+      try {
+        // Try cache first for searches
+        console.log('Checking cache for search:', params.param1);
+        const cacheResult = await searchWithCache(
+          params.param1,
+          params.param2 ? params.param2.split(',').map(Number) : null,
+          params.param5 || 100
+        );
+        
+        if (cacheResult && cacheResult.results) {
+          console.log(`Cache hit: Found ${cacheResult.results.length} results`);
+          // Transform to match RS API format
+          return res.json(cacheResult.results.map(r => ({
+            ref: r.resource_id,
+            field8: r.title,
+            resource_type: r.resource_type,
+            file_extension: r.file_extension,
+            has_image: r.has_cached_file ? 1 : 0,
+            creation_date: r.creation_date,
+            file_size: r.file_size
+          })));
+        }
+      } catch (cacheError) {
+        console.log('Cache miss or error, falling back to RS API:', cacheError.message);
+      }
+    }
+    
+    // Check cache for get_resource_data
+    if (fn === 'get_resource_data' && params.param1) {
+      try {
+        const cached = await getCachedResource(params.param1);
+        if (cached) {
+          console.log(`Cache hit for resource ${params.param1}`);
+          return res.json(cached);
+        }
+      } catch (cacheError) {
+        console.log('Cache miss for resource, falling back to RS API');
+      }
+    }
     
     // Build query parameters - order matters!
     const orderedParams = [
@@ -147,7 +216,7 @@ app.post('/api/proxy', async (req, res) => {
     // Always use the API key for signing (session keys don't seem to work)
     const signature = crypto.createHash('sha256').update(RS_API_KEY + queryString).digest('hex');
     
-    console.log('API request:', fn, 'with params:', Object.keys(params).length);
+    console.log('API request:', fn, 'with params:', params);
     
     // Log search details for do_search
     if (fn === 'do_search') {
@@ -181,8 +250,24 @@ app.post('/api/proxy', async (req, res) => {
       response = await axios.get(url);
     }
     
-    console.log('API response for', fn, ':', response.data);
-    res.json(response.data);
+    console.log('API response for', fn, ':', typeof response.data === 'string' ? response.data.substring(0, 100) + '...' : response.data);
+    
+    // Special handling for get_resource_path - return backend URL instead of RS URL
+    if (fn === 'get_resource_path' && response.data && typeof response.data === 'string' && response.data.startsWith('http')) {
+      // Return our backend URL that will handle caching
+      const size = params.param3 || '';
+      // Use preview endpoint for preview sizes, file endpoint for full files
+      let backendUrl;
+      if (size && ['thm', 'pre', 'scr', 'col'].includes(size)) {
+        backendUrl = `${process.env.BACKEND_URL || 'http://localhost:3003'}/api/resource/${params.param1}/preview?size=${size}`;
+      } else {
+        backendUrl = `${process.env.BACKEND_URL || 'http://localhost:3003'}/api/resource/${params.param1}/file?size=${size}`;
+      }
+      console.log(`Returning backend URL for file: ${backendUrl}`);
+      res.json(backendUrl);
+    } else {
+      res.json(response.data);
+    }
   } catch (error) {
     console.error('API error:', error.message);
     res.status(error.response?.status || 500).json({
@@ -340,7 +425,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Preview endpoint - proxies preview images from ResourceSpace
+// Preview endpoint - uses cache first, then proxies from ResourceSpace
 app.get('/api/resource/:ref/preview', async (req, res) => {
   try {
     const { ref } = req.params;
@@ -348,7 +433,28 @@ app.get('/api/resource/:ref/preview', async (req, res) => {
     
     console.log(`Fetching preview for resource ${ref}, size: ${size}`);
     
-    // Get the resource path from ResourceSpace
+    // Try cache first
+    try {
+      const cachedPreview = await getCachedPreview(ref, size);
+      if (cachedPreview && cachedPreview.preview_url) {
+        console.log(`Cache hit for preview ${ref} size ${size}`);
+        
+        // If we have a URL, fetch and proxy it
+        const imageResponse = await axios.get(cachedPreview.preview_url, {
+          responseType: 'stream'
+        });
+        
+        res.set('Content-Type', imageResponse.headers['content-type'] || 'image/jpeg');
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.set('X-Cache', 'HIT');
+        
+        return imageResponse.data.pipe(res);
+      }
+    } catch (cacheError) {
+      console.log('Cache miss for preview, falling back to RS API');
+    }
+    
+    // Fall back to ResourceSpace API
     const params = {
       user: RS_USER,
       function: 'get_resource_path',
@@ -380,6 +486,7 @@ app.get('/api/resource/:ref/preview', async (req, res) => {
       // Set appropriate headers
       res.set('Content-Type', imageResponse.headers['content-type'] || 'image/jpeg');
       res.set('Cache-Control', 'public, max-age=3600');
+      res.set('X-Cache', 'MISS');
       
       // Stream the image to the client
       imageResponse.data.pipe(res);
@@ -396,6 +503,93 @@ app.get('/api/resource/:ref/preview', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch preview'
+    });
+  }
+});
+
+// File streaming endpoint - for videos and original files
+app.get('/api/resource/:ref/file', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { size = '' } = req.query; // empty size means original file
+    
+    console.log(`Fetching file for resource ${ref}, size: ${size || 'original'}`);
+    
+    // Try cache first
+    try {
+      const cachedFile = await getCachedFile(ref);
+      if (cachedFile && cachedFile.stream) {
+        console.log(`Cache hit for file ${ref}`);
+        
+        // Set appropriate headers
+        res.set('Content-Type', cachedFile.headers['content-type'] || 'application/octet-stream');
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.set('X-Cache', 'HIT');
+        
+        return cachedFile.stream.pipe(res);
+      }
+    } catch (cacheError) {
+      console.log('Cache miss for file, falling back to RS API');
+    }
+    
+    // Fall back to ResourceSpace API to get file URL
+    const params = {
+      user: RS_USER,
+      function: 'get_resource_path',
+      param1: ref,        // resource ID
+      param2: '',         // not_used
+      param3: size,       // size code (empty for original)
+      param4: 0,          // don't generate (for original files)
+      param5: '',         // extension (let RS determine)
+      param6: 1,          // page
+      param7: 0,          // watermarked
+      param8: -1          // alternative (-1 = original)
+    };
+    
+    const queryString = Object.entries(params)
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&');
+    
+    const signature = signRequest(queryString);
+    const apiUrl = `${RS_API_URL}?${queryString}&sign=${signature}`;
+    
+    const response = await axios.get(apiUrl);
+    
+    if (response.data && typeof response.data === 'string' && response.data.startsWith('http')) {
+      // Got a URL, fetch the file
+      const fileResponse = await axios.get(response.data, {
+        responseType: 'stream'
+      });
+      
+      // Set appropriate headers
+      res.set('Content-Type', fileResponse.headers['content-type'] || 'application/octet-stream');
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.set('X-Cache', 'MISS');
+      
+      // Support range requests for video streaming
+      const range = req.headers.range;
+      if (range && fileResponse.headers['accept-ranges'] === 'bytes') {
+        res.status(206);
+        res.set('Content-Range', fileResponse.headers['content-range']);
+        res.set('Accept-Ranges', 'bytes');
+        res.set('Content-Length', fileResponse.headers['content-length']);
+      }
+      
+      // Stream the file to the client
+      fileResponse.data.pipe(res);
+    } else {
+      console.error('Invalid file URL response:', response.data);
+      res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+    
+  } catch (error) {
+    console.error('File fetch error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch file'
     });
   }
 });
@@ -1276,6 +1470,69 @@ app.post('/api/collections/featured', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Cache management endpoints
+app.get('/api/cache/status', async (req, res) => {
+  try {
+    const stats = await getCacheStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Failed to get cache stats:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get cache statistics'
+    });
+  }
+});
+
+app.post('/api/cache/prefetch', async (req, res) => {
+  try {
+    const { resourceIds, includeFiles = false } = req.body;
+    
+    if (!Array.isArray(resourceIds)) {
+      return res.status(400).json({
+        success: false,
+        error: 'resourceIds must be an array'
+      });
+    }
+    
+    const result = await prefetchResources(resourceIds, includeFiles);
+    res.json(result);
+  } catch (error) {
+    console.error('Prefetch error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to prefetch resources'
+    });
+  }
+});
+
+app.delete('/api/cache/resource/:ref', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const result = await evictResource(ref);
+    res.json(result);
+  } catch (error) {
+    console.error('Eviction error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to evict resource'
+    });
+  }
+});
+
+app.listen(PORT, async () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
+  console.log(`ResourceSpace API URL: ${RS_API_URL}`);
+  console.log(`Cache API URL: ${process.env.CACHE_API_URL || 'http://cache_api:8000'}`);
+  
+  // Check cache API health
+  try {
+    const cacheHealthy = await checkCacheHealth();
+    console.log(`Cache API status: ${cacheHealthy ? 'HEALTHY' : 'UNAVAILABLE'}`);
+    if (!cacheHealthy) {
+      console.warn('Cache API is not available - falling back to direct RS API calls');
+    }
+  } catch (error) {
+    console.error('Could not check cache API health:', error.message);
+  }
 });
