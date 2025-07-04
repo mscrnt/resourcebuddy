@@ -84,6 +84,19 @@ const useSettingsStore = create(
         root.style.setProperty('--color-dark-text-secondary', settings.darkTextSecondary || '#a3a3a3')
         root.style.setProperty('--color-dark-border', settings.darkBorder || '#404040')
         
+        // Apply light/dark theme preference
+        if (settings.enableLightTheme) {
+          // Store theme preference in localStorage
+          localStorage.setItem('theme', settings.theme || 'dark')
+          
+          // Apply theme class to document
+          if (settings.theme === 'light') {
+            document.documentElement.classList.add('light')
+          } else {
+            document.documentElement.classList.remove('light')
+          }
+        }
+        
         // Update document title
         document.title = settings.appTitle || 'ResourceBuddy'
         
@@ -97,6 +110,14 @@ const useSettingsStore = create(
           }
           styleElement.textContent = settings.customCss
         }
+      },
+      
+      // Toggle theme between light and dark
+      toggleTheme: () => {
+        const { settings } = get()
+        const newTheme = settings.theme === 'light' ? 'dark' : 'light'
+        set({ settings: { ...settings, theme: newTheme } })
+        get().applyTheme()
       }
     }),
     {
