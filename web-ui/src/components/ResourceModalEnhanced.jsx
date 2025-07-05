@@ -674,32 +674,33 @@ const ResourceModalEnhanced = memo(({
                   onMouseDown={() => setIsResizingMetadata(true)}
                 />
 
-                {/* Close button inside panel */}
-                <button
-                  onClick={() => setShowMetadata(false)}
-                  className="absolute top-4 right-4 z-10 p-1.5 rounded-md bg-art-gray-800 hover:bg-art-gray-700 text-white transition-all"
-                  title="Close metadata panel (I)"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                {/* Header with close button and view logs button */}
+                <div className="absolute top-4 right-4 left-4 z-10 flex justify-between items-center">
+                  <button
+                    onClick={() => {
+                      loadResourceLog();
+                      setShowResourceLog(true);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-art-gray-800 hover:bg-art-gray-700 text-white transition-all"
+                    title="View activity log"
+                  >
+                    <History className="h-4 w-4" />
+                    <span className="text-sm font-medium">Activity Log</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowMetadata(false)}
+                    className="p-1.5 rounded-md bg-art-gray-800 hover:bg-art-gray-700 text-white transition-all"
+                    title="Close metadata panel (I)"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
 
                 <div className={cn(
                   "pt-12 px-4 pb-6 h-full overflow-y-auto",
                   metadataWidth > 400 ? "px-6" : "px-4"
                 )}>
-                  {/* View Logs Button */}
-                  <div className="mb-4">
-                    <button
-                      onClick={() => {
-                        loadResourceLog();
-                        setShowResourceLog(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-art-gray-800 hover:bg-art-gray-700 text-white rounded-lg transition-colors"
-                    >
-                      <History className="h-4 w-4" />
-                      <span className="text-sm font-medium">View Activity Log</span>
-                    </button>
-                  </div>
 
                   {/* Resource Type */}
                   <div className="mb-6">
