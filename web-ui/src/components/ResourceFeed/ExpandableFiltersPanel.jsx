@@ -122,11 +122,11 @@ export default function ExpandableFiltersPanel({
   if (activeFilterCount === 0) return null
   
   return (
-    <div className="border-t border-art-gray-800">
+    <div className="border-t border-theme-primary">
       {/* Collapsed View - Filter Chips */}
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1">
-          <div className="flex items-center gap-2 text-sm text-art-gray-400">
+          <div className="flex items-center gap-2 text-sm text-theme-secondary">
             <Filter className="h-4 w-4" />
             <span>{activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} applied</span>
           </div>
@@ -135,9 +135,9 @@ export default function ExpandableFiltersPanel({
             {filterChips.slice(0, isExpanded ? filterChips.length : 3).map((chip, index) => (
               <div
                 key={`${chip.field}-${index}`}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-art-gray-800 text-white text-sm rounded-full"
+                className="inline-flex items-center gap-1 px-3 py-1 bg-theme-tertiary text-theme-primary text-sm rounded-full"
               >
-                <span className="text-art-gray-400">{chip.label}:</span>
+                <span className="text-theme-secondary">{chip.label}:</span>
                 <span className="max-w-[150px] truncate">{chip.value}</span>
                 <button
                   onClick={() => handleRemoveFilter(chip.field)}
@@ -150,7 +150,7 @@ export default function ExpandableFiltersPanel({
             ))}
             
             {!isExpanded && filterChips.length > 3 && (
-              <span className="text-sm text-art-gray-400">
+              <span className="text-sm text-theme-secondary">
                 +{filterChips.length - 3} more
               </span>
             )}
@@ -194,28 +194,28 @@ export default function ExpandableFiltersPanel({
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
                 {localFilters.allWords && (
                   <div>
-                    <label className="block text-xs font-medium text-art-gray-400 mb-1">
+                    <label className="block text-xs font-medium text-theme-secondary mb-1">
                       All words
                     </label>
                     <input
                       type="text"
                       value={localFilters.allWords}
                       onChange={(e) => handleChange('allWords', e.target.value)}
-                      className="w-full px-2 py-1 bg-art-gray-800 text-white text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
+                      className="w-full px-2 py-1 input-theme text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
                     />
                   </div>
                 )}
                 
                 {localFilters.keywords && (
                   <div>
-                    <label className="block text-xs font-medium text-art-gray-400 mb-1">
+                    <label className="block text-xs font-medium text-theme-secondary mb-1">
                       Keywords
                     </label>
                     <input
                       type="text"
                       value={localFilters.keywords}
                       onChange={(e) => handleChange('keywords', e.target.value)}
-                      className="w-full px-2 py-1 bg-art-gray-800 text-white text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
+                      className="w-full px-2 py-1 input-theme text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
                     />
                   </div>
                 )}
@@ -223,26 +223,26 @@ export default function ExpandableFiltersPanel({
                 {(localFilters.dateFrom || localFilters.dateTo) && (
                   <>
                     <div>
-                      <label className="block text-xs font-medium text-art-gray-400 mb-1">
+                      <label className="block text-xs font-medium text-theme-secondary mb-1">
                         From Date
                       </label>
                       <input
                         type="date"
                         value={localFilters.dateFrom}
                         onChange={(e) => handleChange('dateFrom', e.target.value)}
-                        className="w-full px-2 py-1 bg-art-gray-800 text-white text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
+                        className="w-full px-2 py-1 input-theme text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
                       />
                     </div>
                     
                     <div>
-                      <label className="block text-xs font-medium text-art-gray-400 mb-1">
+                      <label className="block text-xs font-medium text-theme-secondary mb-1">
                         To Date
                       </label>
                       <input
                         type="date"
                         value={localFilters.dateTo}
                         onChange={(e) => handleChange('dateTo', e.target.value)}
-                        className="w-full px-2 py-1 bg-art-gray-800 text-white text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
+                        className="w-full px-2 py-1 input-theme text-sm rounded focus:outline-none focus:ring-1 focus:ring-art-accent"
                       />
                     </div>
                   </>
@@ -250,7 +250,7 @@ export default function ExpandableFiltersPanel({
                 
                 {localFilters.resourceTypes?.length > 0 && (
                   <div>
-                    <label className="block text-xs font-medium text-art-gray-400 mb-1">
+                    <label className="block text-xs font-medium text-theme-secondary mb-1">
                       Resource Types
                     </label>
                     <div className="flex flex-wrap gap-1">
@@ -261,7 +261,7 @@ export default function ExpandableFiltersPanel({
                             "inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded cursor-pointer transition-colors",
                             localFilters.resourceTypes.includes(type.ref)
                               ? "bg-art-accent text-white"
-                              : "bg-art-gray-800 text-art-gray-400 hover:text-white"
+                              : "bg-theme-tertiary text-theme-secondary hover:text-theme-primary"
                           )}
                         >
                           <input
@@ -280,7 +280,7 @@ export default function ExpandableFiltersPanel({
               
               {/* Operator */}
               <div className="flex items-center gap-4">
-                <span className="text-xs text-art-gray-400">Search operator:</span>
+                <span className="text-xs text-theme-secondary">Search operator:</span>
                 <div className="flex gap-2">
                   <label className="inline-flex items-center gap-1 cursor-pointer">
                     <input
@@ -289,9 +289,9 @@ export default function ExpandableFiltersPanel({
                       value="AND"
                       checked={localFilters.operator === 'AND'}
                       onChange={(e) => handleChange('operator', e.target.value)}
-                      className="w-3 h-3 text-art-accent bg-art-gray-800 border-art-gray-600"
+                      className="w-3 h-3 text-art-accent bg-theme-tertiary border-theme-secondary"
                     />
-                    <span className="text-sm text-white">AND</span>
+                    <span className="text-sm text-theme-primary">AND</span>
                   </label>
                   <label className="inline-flex items-center gap-1 cursor-pointer">
                     <input
@@ -300,9 +300,9 @@ export default function ExpandableFiltersPanel({
                       value="OR"
                       checked={localFilters.operator === 'OR'}
                       onChange={(e) => handleChange('operator', e.target.value)}
-                      className="w-3 h-3 text-art-accent bg-art-gray-800 border-art-gray-600"
+                      className="w-3 h-3 text-art-accent bg-theme-tertiary border-theme-secondary"
                     />
-                    <span className="text-sm text-white">OR</span>
+                    <span className="text-sm text-theme-primary">OR</span>
                   </label>
                 </div>
               </div>

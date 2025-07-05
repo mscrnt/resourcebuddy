@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,6 +8,17 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Theme-aware background colors
+        'background': {
+          DEFAULT: 'rgb(255 255 255)',
+          secondary: 'rgb(249 250 251)',
+          tertiary: 'rgb(243 244 246)',
+        },
+        'foreground': {
+          DEFAULT: 'rgb(17 24 39)',
+          secondary: 'rgb(107 114 128)',
+        },
+        // Legacy dark theme colors (now using CSS variables)
         'art-dark': 'var(--color-dark-bg, #0a0a0a)',
         'art-darker': 'var(--color-dark-bg-secondary, #171717)',
         'art-gray': {

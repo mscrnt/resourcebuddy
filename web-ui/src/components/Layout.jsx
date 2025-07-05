@@ -31,7 +31,7 @@ export default function Layout() {
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [currentTheme, setCurrentTheme] = useState('dark')
   const { user, logout } = useAuthStore()
-  const { settings, fetchSettings, applyTheme } = useSettingsStore()
+  const { settings, fetchSettings, applyTheme, updateSettings } = useSettingsStore()
   const userMenuRef = useRef(null)
   const adminMenuRef = useRef(null)
   
@@ -47,10 +47,16 @@ export default function Layout() {
     // Apply theme to UI
     if (newTheme === 'light') {
       document.documentElement.classList.remove('dark')
-      document.documentElement.classList.add('light')
     } else {
-      document.documentElement.classList.remove('light')
       document.documentElement.classList.add('dark')
+    }
+    
+    // Save to localStorage for immediate persistence
+    localStorage.setItem('user-theme-preference', newTheme)
+    
+    // Also update the settings store theme
+    if (settings.theme !== newTheme) {
+      await updateSettings({ ...settings, theme: newTheme })
     }
     
     // Save theme preference to backend
@@ -75,8 +81,16 @@ export default function Layout() {
   
   // Fetch settings on mount
   useEffect(() => {
-    // Set initial theme class
-    document.documentElement.classList.add('dark')
+    // Check localStorage first for immediate theme application
+    const savedTheme = localStorage.getItem('user-theme-preference') || 'dark'
+    setCurrentTheme(savedTheme)
+    
+    // Apply initial theme class
+    if (savedTheme === 'light' && settings.enableLightTheme !== false) {
+      document.documentElement.classList.remove('dark')
+    } else {
+      document.documentElement.classList.add('dark')
+    }
     
     fetchSettings().then(() => {
       applyTheme()
@@ -105,9 +119,7 @@ export default function Layout() {
                 setCurrentTheme(metadataData.user.theme_preference)
                 if (metadataData.user.theme_preference === 'light' && settings.enableLightTheme !== false) {
                   document.documentElement.classList.remove('dark')
-                  document.documentElement.classList.add('light')
                 } else {
-                  document.documentElement.classList.remove('light')
                   document.documentElement.classList.add('dark')
                 }
               }
@@ -152,9 +164,9 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-art-dark">
+    <div className="min-h-screen bg-theme-primary">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-art-darker/95 backdrop-blur-sm border-b border-art-gray-800">
+      <header className="sticky top-0 z-40 bg-theme-secondary/95 backdrop-blur-sm border-b border-theme-primary">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex h-16 items-center justify-between">
             {/* Logo and Desktop Nav */}
@@ -170,14 +182,18 @@ export default function Layout() {
                   }
                 }}
               >
-                {(settings.logoDarkUrl || settings.logoUrl) ? (
+                {(settings.logoDarkUrl || settings.logoLightUrl || settings.logoUrl) ? (
                   <img 
-                    src={settings.logoDarkUrl || settings.logoUrl || '/logo-dark.png'} 
+                    src={
+                      currentTheme === 'dark' 
+                        ? (settings.logoDarkUrl || settings.logoUrl || '/logo-dark.png')
+                        : (settings.logoLightUrl || settings.logoUrl || '/logo-light.png')
+                    } 
                     alt={settings.appTitle || "ResourceBuddy"} 
                     className="h-14 w-auto object-contain" 
                   />
                 ) : (
-                  <h1 className="text-2xl font-bold text-white">{settings.appTitle || "ResourceBuddy"}</h1>
+                  <h1 className="text-2xl font-bold text-theme-primary">{settings.appTitle || "ResourceBuddy"}</h1>
                 )}
               </Link>
               
@@ -200,8 +216,8 @@ export default function Layout() {
                       className={cn(
                         'inline-flex items-center px-1 pt-1 text-xl font-medium transition-colors relative',
                         isActive
-                          ? 'text-white'
-                          : 'text-art-gray-400 hover:text-white'
+                          ? 'text-theme-primary'
+                          : 'text-theme-secondary hover:text-theme-primary'
                       )}
                     >
                       {item.faIcon && <i className={`fas ${item.faIcon} mr-2 text-lg`} />}
@@ -216,14 +232,15 @@ export default function Layout() {
             </div>
 
             {/* Search and User Menu */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
               <HeaderSearchBar />
               
               {/* Theme Toggle */}
               {settings.enableLightTheme !== false && (
                 <button
                   onClick={handleThemeToggle}
-                  className="p-2 text-art-gray-400 hover:text-white transition-colors"
+                  className="p-2 rounded-lg text-theme-secondary hover:text-theme-primary bg-theme-hover focus:outline-none focus:ring-2 focus:ring-art-accent focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200 flex-shrink-0"
+                  aria-label={`Switch to ${currentTheme === 'dark' ? 'light' : 'dark'} mode`}
                   title={`Switch to ${currentTheme === 'dark' ? 'light' : 'dark'} mode`}
                 >
                   {currentTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -234,8 +251,10 @@ export default function Layout() {
               <div className="flex items-center gap-2">
                 <div className="relative" ref={userMenuRef}>
                   <button 
-                    className="flex items-center gap-2 rounded-full p-2 text-art-gray-400 hover:text-white transition-colors"
+                    className="flex items-center gap-2 rounded-full p-2 text-theme-secondary hover:text-theme-primary bg-theme-hover focus:outline-none focus:ring-2 focus:ring-art-accent focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200"
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    aria-label="User menu"
+                    aria-expanded={userMenuOpen}
                   >
                     <User className="h-5 w-5" />
                     {userMetadata && (
@@ -245,10 +264,10 @@ export default function Layout() {
                 
                 {/* User Dropdown Menu */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-md bg-art-gray-900 py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+                  <div className="absolute right-0 mt-2 w-48 rounded-md dropdown-theme py-1">
                     {userMetadata && (
-                      <div className="px-4 py-2 text-sm text-art-gray-400 border-b border-art-gray-800">
-                        <div className="font-medium text-white">{userMetadata.fullname || user.username}</div>
+                      <div className="px-4 py-2 text-sm text-theme-secondary border-b border-theme-primary">
+                        <div className="font-medium text-theme-primary">{userMetadata.fullname || user.username}</div>
                         <div className="text-xs">{user.username}</div>
                       </div>
                     )}
@@ -257,14 +276,14 @@ export default function Layout() {
                         setUserMenuOpen(false)
                         setProfileModalOpen(true)
                       }}
-                      className="flex w-full items-center px-4 py-2 text-sm text-art-gray-300 hover:bg-art-gray-800 hover:text-white"
+                      className="flex w-full items-center px-4 py-2 text-sm text-theme-secondary bg-theme-hover"
                     >
                       <User className="mr-3 h-4 w-4" />
                       My Profile
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="flex w-full items-center px-4 py-2 text-sm text-art-gray-300 hover:bg-art-gray-800 hover:text-white"
+                      className="flex w-full items-center px-4 py-2 text-sm text-theme-secondary bg-theme-hover"
                     >
                       <LogOut className="mr-3 h-4 w-4" />
                       Sign out
@@ -277,18 +296,20 @@ export default function Layout() {
                 {hasAdminPermission && (
                   <div className="relative" ref={adminMenuRef}>
                     <button 
-                      className="p-2 text-art-gray-400 hover:text-white transition-colors"
+                      className="p-2 rounded-lg text-theme-secondary hover:text-theme-primary bg-theme-hover focus:outline-none focus:ring-2 focus:ring-art-accent focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200"
                       onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                      aria-label="Admin menu"
+                      aria-expanded={adminMenuOpen}
                     >
                       <MoreVertical className="h-5 w-5" />
                     </button>
                     
                     {adminMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-48 rounded-md bg-art-gray-900 py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="absolute right-0 mt-2 w-48 rounded-md dropdown-theme py-1">
                         <Link
                           to="/admin"
                           onClick={() => setAdminMenuOpen(false)}
-                          className="flex w-full items-center px-4 py-2 text-sm text-art-gray-300 hover:bg-art-gray-800 hover:text-white"
+                          className="flex w-full items-center px-4 py-2 text-sm text-theme-secondary bg-theme-hover"
                         >
                           <Settings className="mr-3 h-4 w-4" />
                           Admin Panel
@@ -301,7 +322,7 @@ export default function Layout() {
 
               {/* Mobile menu button */}
               <button
-                className="md:hidden rounded-md p-2 text-art-gray-400 hover:text-white"
+                className="md:hidden rounded-md p-2 text-theme-secondary hover:text-theme-primary"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? (
@@ -316,7 +337,7 @@ export default function Layout() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <nav className="md:hidden bg-art-darker border-t border-art-gray-800">
+          <nav className="md:hidden bg-theme-secondary border-t border-theme-primary">
             <div className="space-y-1 px-2 pb-3 pt-2">
               {navigation.map((item) => {
                 const isActive = location.pathname === item.href || 
@@ -337,7 +358,7 @@ export default function Layout() {
                       'block rounded-md px-3 py-2 text-lg font-medium transition-colors',
                       isActive
                         ? 'bg-art-accent text-white'
-                        : 'text-art-gray-400 hover:bg-art-gray-800 hover:text-white'
+                        : 'text-theme-secondary bg-theme-hover'
                     )}
                   >
                     <span className="flex items-center">
@@ -358,9 +379,9 @@ export default function Layout() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-art-darker border-t border-art-gray-800 mt-auto">
+      <footer className="bg-theme-secondary border-t border-theme-primary mt-auto">
         <div className="mx-auto px-6 py-6 sm:px-8 lg:px-12 xl:px-16">
-          <p className="text-center text-sm text-art-gray-500">
+          <p className="text-center text-sm text-theme-tertiary">
             Powered by ResourceSpace
           </p>
         </div>

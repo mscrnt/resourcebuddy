@@ -233,21 +233,21 @@ export default function FloatingSearchBar({
   const currentSortOption = SORT_OPTIONS.find(opt => opt.value === sortField)
 
   return (
-    <div className="fixed top-16 left-0 right-0 z-30 bg-art-darker/95 backdrop-blur-sm border-b border-art-gray-800">
+    <div className="fixed top-16 left-0 right-0 z-30 bg-theme-secondary/95 backdrop-blur-sm border-b border-theme-primary">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Breadcrumbs */}
         {showBreadcrumbs && breadcrumbs.length > 0 && (
-          <div className="py-2 flex items-center text-sm text-art-gray-400">
+          <div className="py-2 flex items-center text-sm text-theme-secondary">
             <i className="fas fa-home mr-2"></i>
             {breadcrumbs.map((crumb, index) => (
               <span key={index} className="flex items-center">
                 {index > 0 && <i className="fas fa-chevron-right mx-2 text-xs"></i>}
                 {crumb.link ? (
-                  <a href={crumb.link} className="hover:text-white transition-colors">
+                  <a href={crumb.link} className="hover:text-theme-primary transition-colors">
                     {crumb.label}
                   </a>
                 ) : (
-                  <span className="text-white">{crumb.label}</span>
+                  <span className="text-theme-primary">{crumb.label}</span>
                 )}
               </span>
             ))}
@@ -266,7 +266,7 @@ export default function FloatingSearchBar({
                       value={searchValue}
                       onChange={(e) => setSearchValue(e.target.value)}
                       placeholder="Search resources..."
-                      className="w-full pl-4 pr-10 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="w-full pl-4 pr-10 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
                     {/* Clear button inside input */}
                     {searchValue && (
@@ -276,7 +276,7 @@ export default function FloatingSearchBar({
                           setSearchValue('')
                           onSearch('')
                         }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-art-gray-400 hover:text-white transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-secondary hover:text-theme-primary transition-colors"
                         aria-label="Clear search"
                       >
                         <X className="h-4 w-4" />
@@ -287,7 +287,7 @@ export default function FloatingSearchBar({
                   {/* Search button outside input */}
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-art-accent text-white rounded-lg hover:bg-art-accent-dark transition-colors flex items-center gap-2"
+                    className="px-4 py-2 btn-theme-primary rounded-lg transition-colors flex items-center gap-2"
                     aria-label="Search"
                   >
                     <Search className="h-5 w-5" />
@@ -297,21 +297,21 @@ export default function FloatingSearchBar({
                   <div className="relative group">
                     <button
                       type="button"
-                      className="flex items-center gap-2 px-4 py-2 bg-art-gray-800 text-white rounded-lg hover:bg-art-gray-700 transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 btn-theme-secondary rounded-lg transition-colors"
                     >
                       <i className={`fas ${currentSortOption?.icon || 'fa-sort'}`}></i>
                       <span className="hidden sm:inline">{currentSortOption?.label || 'Sort'}</span>
                       <i className={`fas fa-chevron-${sortOrder === 'asc' ? 'up' : 'down'} text-xs`}></i>
                     </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-art-gray-900 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                    <div className="absolute right-0 mt-2 w-48 dropdown-theme rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                       {SORT_OPTIONS.map(option => (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => handleSortChange(option.value)}
                           className={cn(
-                            "w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-art-gray-800 transition-colors",
-                            sortField === option.value ? "text-art-accent" : "text-white"
+                            "w-full flex items-center gap-3 px-4 py-2 text-left bg-theme-hover transition-colors",
+                            sortField === option.value ? "text-art-accent" : "text-theme-primary"
                           )}
                         >
                           <i className={`fas ${option.icon} w-4`}></i>
@@ -325,7 +325,7 @@ export default function FloatingSearchBar({
                   </div>
 
                   {/* View Mode Toggle */}
-                  <div className="flex bg-art-gray-800 rounded-lg p-1">
+                  <div className="flex bg-theme-tertiary rounded-lg p-1">
                     {VIEW_MODE_OPTIONS.map(option => (
                       <button
                         key={option.value}
@@ -335,7 +335,7 @@ export default function FloatingSearchBar({
                           "px-3 py-1.5 rounded transition-colors",
                           viewMode === option.value
                             ? "bg-art-accent text-white"
-                            : "text-art-gray-400 hover:text-white"
+                            : "text-theme-secondary hover:text-theme-primary"
                         )}
                         title={option.label}
                       >
@@ -348,7 +348,7 @@ export default function FloatingSearchBar({
                   <button
                     type="button"
                     onClick={() => setShowAdvancedModal(true)}
-                    className="px-4 py-2 bg-art-gray-800 text-white rounded-lg hover:bg-art-gray-700 transition-colors flex items-center gap-2"
+                    className="px-4 py-2 btn-theme-secondary rounded-lg transition-colors flex items-center gap-2"
                   >
                     <i className="fas fa-search-plus"></i>
                     <span className="hidden sm:inline">Advanced Search</span>
@@ -359,7 +359,7 @@ export default function FloatingSearchBar({
                     <button
                       type="button"
                       onClick={() => setActionsOpen(!actionsOpen)}
-                      className="px-4 py-2 bg-art-gray-800 text-white rounded-lg hover:bg-art-gray-700 transition-colors flex items-center gap-2"
+                      className="px-4 py-2 btn-theme-secondary rounded-lg transition-colors flex items-center gap-2"
                       title="Actions"
                     >
                       <i className="fas fa-ellipsis-v"></i>

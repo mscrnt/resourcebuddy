@@ -113,9 +113,9 @@ export default function ResourceCard({
         draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        className="flex items-center gap-4 p-4 bg-art-gray-900 rounded-lg hover:bg-art-gray-800 transition-colors group cursor-pointer"
+        className="flex items-center gap-4 p-4 card-theme rounded-lg bg-theme-hover transition-colors group cursor-pointer"
       >
-        <div className="w-24 h-24 flex-shrink-0 bg-art-gray-800 rounded-lg overflow-hidden">
+        <div className="w-24 h-24 flex-shrink-0 bg-theme-tertiary rounded-lg overflow-hidden">
           {!imageError ? (
             <img
               src={previewUrl}
@@ -125,16 +125,16 @@ export default function ResourceCard({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <i className="fas fa-image text-2xl text-art-gray-600"></i>
+              <i className="fas fa-image text-2xl text-theme-tertiary"></i>
             </div>
           )}
         </div>
         
         <div className="flex-1 min-w-0">
-          <h3 className="text-white font-medium truncate group-hover:text-art-accent transition-colors">
+          <h3 className="text-theme-primary font-medium truncate group-hover:text-art-accent transition-colors">
             {title}
           </h3>
-          <div className="flex items-center gap-4 mt-1 text-sm text-art-gray-400">
+          <div className="flex items-center gap-4 mt-1 text-sm text-theme-secondary">
             <span className="flex items-center gap-1">
               <i className="fas fa-calendar text-xs"></i>
               {new Date(resource.creation_date).toLocaleDateString()}
@@ -238,7 +238,7 @@ export default function ResourceCard({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         className={cn(
-          "relative aspect-square bg-art-gray-900 overflow-hidden group cursor-pointer",
+          "relative aspect-square card-theme overflow-hidden group cursor-pointer",
           selected && "ring-2 ring-art-accent"
         )}
       >
@@ -250,8 +250,8 @@ export default function ResourceCard({
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-art-gray-800">
-            <i className="fas fa-image text-xl text-art-gray-600"></i>
+          <div className="w-full h-full flex items-center justify-center bg-theme-tertiary">
+            <i className="fas fa-image text-xl text-theme-tertiary"></i>
           </div>
         )}
         
@@ -289,12 +289,12 @@ export default function ResourceCard({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       className={cn(
-        "group cursor-pointer bg-art-gray-900 rounded-lg overflow-hidden border border-art-gray-800 hover:border-art-gray-700 transition-all",
+        "group cursor-pointer card-theme rounded-lg overflow-hidden border border-theme-primary hover:border-theme-secondary transition-all",
         selected && "ring-2 ring-art-accent"
       )}
     >
       {/* Top bar with file extension and resource type */}
-      <div className="flex items-center justify-between px-3 py-2 bg-art-gray-800/50 border-b border-art-gray-800">
+      <div className="flex items-center justify-between px-3 py-2 bg-theme-tertiary/50 border-b border-theme-primary">
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -307,21 +307,21 @@ export default function ResourceCard({
             )}
           />
           {resource.file_extension && (
-            <span className="text-xs font-bold text-art-gray-400 uppercase">
+            <span className="text-xs font-bold text-theme-secondary uppercase">
               {resource.file_extension}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {resource.archive !== undefined && resource.archive !== 0 && (
-            <i className="fas fa-archive text-xs text-art-gray-500" title={`Archive state: ${resource.archive}`}></i>
+            <i className="fas fa-archive text-xs text-theme-tertiary" title={`Archive state: ${resource.archive}`}></i>
           )}
-          <span className="text-xs text-art-gray-500">#{resource.ref}</span>
+          <span className="text-xs text-theme-tertiary">#{resource.ref}</span>
         </div>
       </div>
       
       {/* Thumbnail */}
-      <div className="relative aspect-[4/3] bg-art-gray-950 overflow-hidden">
+      <div className="relative aspect-[4/3] bg-theme-secondary overflow-hidden">
         {!imageError ? (
           <img
             src={previewUrl}
@@ -384,8 +384,8 @@ export default function ResourceCard({
         </div>
         
         {/* Bottom stats */}
-        <div className="flex items-center justify-between pt-2 border-t border-art-gray-800">
-          <div className="flex items-center gap-3 text-xs text-art-gray-500">
+        <div className="flex items-center justify-between pt-2 border-t border-theme-primary">
+          <div className="flex items-center gap-3 text-xs text-theme-tertiary">
             {resource.hit_count !== undefined && (
               <span className="flex items-center gap-1">
                 <i className="fas fa-eye"></i>

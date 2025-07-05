@@ -193,8 +193,8 @@ export default function AdminPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
-        <p className="mt-2 text-art-gray-400">
+        <h1 className="text-3xl font-bold text-theme-primary">Admin Panel</h1>
+        <p className="mt-2 text-theme-secondary">
           Customize your RS Art Station instance
         </p>
       </div>
@@ -205,9 +205,9 @@ export default function AdminPage() {
         </div>
       )}
       
-      <div className="bg-art-gray-900 rounded-lg">
+      <div className="card-theme rounded-lg">
         {/* Tabs */}
-        <div className="border-b border-art-gray-800">
+        <div className="border-b border-theme-primary">
           <nav className="flex space-x-8 px-6" aria-label="Tabs">
             {tabs.map((tab) => {
               const Icon = tab.icon
@@ -218,8 +218,8 @@ export default function AdminPage() {
                   className={cn(
                     "flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                     activeTab === tab.id
-                      ? "border-art-accent text-white"
-                      : "border-transparent text-art-gray-400 hover:text-white hover:border-art-gray-600"
+                      ? "border-art-accent text-theme-primary"
+                      : "border-transparent text-theme-secondary hover:text-theme-primary hover:border-theme-secondary"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -235,21 +235,21 @@ export default function AdminPage() {
           {activeTab === 'branding' && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
+                <label className="block text-sm font-medium text-theme-primary mb-2">
                   Application Title
                 </label>
                 <input
                   type="text"
                   value={localSettings.appTitle || ''}
                   onChange={(e) => setLocalSettings({ ...localSettings, appTitle: e.target.value })}
-                  className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                  className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                   placeholder="RS Art Station"
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
+                  <label className="block text-sm font-medium text-theme-primary mb-2">
                     Logo (Dark Mode)
                   </label>
                   <div className="flex items-center gap-4">
@@ -265,7 +265,7 @@ export default function AdminPage() {
                         type="text"
                         value={localSettings.logoDarkUrl || ''}
                         onChange={(e) => setLocalSettings({ ...localSettings, logoDarkUrl: e.target.value })}
-                        className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                        className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                         placeholder="Dark mode logo URL"
                       />
                       <input
@@ -277,7 +277,7 @@ export default function AdminPage() {
                       />
                       <button
                         onClick={() => document.getElementById('logoDarkUpload')?.click()}
-                        className="mt-2 flex items-center gap-2 px-3 py-1 bg-art-gray-700 hover:bg-art-gray-600 text-white rounded text-sm transition-colors"
+                        className="mt-2 flex items-center gap-2 px-3 py-1 btn-theme-secondary rounded text-sm transition-colors"
                       >
                         <Upload className="h-3 w-3" />
                         Upload
@@ -287,7 +287,7 @@ export default function AdminPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
+                  <label className="block text-sm font-medium text-theme-primary mb-2">
                     Logo (Light Mode)
                   </label>
                   <div className="flex items-center gap-4">
@@ -303,7 +303,7 @@ export default function AdminPage() {
                         type="text"
                         value={localSettings.logoLightUrl || ''}
                         onChange={(e) => setLocalSettings({ ...localSettings, logoLightUrl: e.target.value })}
-                        className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                        className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                         placeholder="Light mode logo URL"
                       />
                       <input
@@ -315,7 +315,7 @@ export default function AdminPage() {
                       />
                       <button
                         onClick={() => document.getElementById('logoLightUpload')?.click()}
-                        className="mt-2 flex items-center gap-2 px-3 py-1 bg-art-gray-700 hover:bg-art-gray-600 text-white rounded text-sm transition-colors"
+                        className="mt-2 flex items-center gap-2 px-3 py-1 btn-theme-secondary rounded text-sm transition-colors"
                       >
                         <Upload className="h-3 w-3" />
                         Upload
@@ -326,14 +326,14 @@ export default function AdminPage() {
               </div>
               
               <div className="mt-6">
-                <label className="block text-sm font-medium text-white mb-2">
+                <label className="block text-sm font-medium text-theme-primary mb-2">
                   Legacy Logo URL (Optional)
                 </label>
                 <input
                   type="text"
                   value={localSettings.logoUrl || ''}
                   onChange={(e) => setLocalSettings({ ...localSettings, logoUrl: e.target.value })}
-                  className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                  className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                   placeholder="Fallback logo URL"
                 />
                 <button
@@ -369,7 +369,7 @@ export default function AdminPage() {
               
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
+                  <label className="block text-sm font-medium text-theme-primary mb-2">
                     Primary Color
                   </label>
                   <div className="flex items-center gap-2">
@@ -383,13 +383,13 @@ export default function AdminPage() {
                       type="text"
                       value={localSettings.primaryColor || '#10b981'}
                       onChange={(e) => handleColorChange('primaryColor', e.target.value)}
-                      className="flex-1 px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="flex-1 px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
+                  <label className="block text-sm font-medium text-theme-primary mb-2">
                     Accent Color
                   </label>
                   <div className="flex items-center gap-2">
@@ -403,13 +403,13 @@ export default function AdminPage() {
                       type="text"
                       value={localSettings.accentColor || '#10b981'}
                       onChange={(e) => handleColorChange('accentColor', e.target.value)}
-                      className="flex-1 px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="flex-1 px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
+                  <label className="block text-sm font-medium text-theme-primary mb-2">
                     Dark Background
                   </label>
                   <div className="flex items-center gap-2">
@@ -423,13 +423,13 @@ export default function AdminPage() {
                       type="text"
                       value={localSettings.darkBackground || '#0a0a0a'}
                       onChange={(e) => handleColorChange('darkBackground', e.target.value)}
-                      className="flex-1 px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="flex-1 px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
+                  <label className="block text-sm font-medium text-theme-primary mb-2">
                     Dark Secondary Background
                   </label>
                   <div className="flex items-center gap-2">
@@ -443,7 +443,7 @@ export default function AdminPage() {
                       type="text"
                       value={localSettings.darkBackgroundSecondary || '#171717'}
                       onChange={(e) => handleColorChange('darkBackgroundSecondary', e.target.value)}
-                      className="flex-1 px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="flex-1 px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
                   </div>
                 </div>
@@ -466,13 +466,13 @@ export default function AdminPage() {
           {activeTab === 'layout' && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
+                <label className="block text-sm font-medium text-theme-primary mb-2">
                   Default View
                 </label>
                 <select
                   value={localSettings.defaultView || 'grid'}
                   onChange={(e) => setLocalSettings({ ...localSettings, defaultView: e.target.value })}
-                  className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                  className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                 >
                   <option value="grid">Grid View</option>
                   <option value="list">List View</option>
@@ -481,13 +481,13 @@ export default function AdminPage() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
+                <label className="block text-sm font-medium text-theme-primary mb-2">
                   Grid Columns
                 </label>
                 <select
                   value={localSettings.gridColumns || 'auto'}
                   onChange={(e) => setLocalSettings({ ...localSettings, gridColumns: e.target.value })}
-                  className="w-full px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                  className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                 >
                   <option value="auto">Auto (Responsive)</option>
                   <option value="2">2 Columns</option>
@@ -499,7 +499,7 @@ export default function AdminPage() {
               </div>
               
               <div className="space-y-3">
-                <h4 className="text-sm font-medium text-white">Feature Toggles</h4>
+                <h4 className="text-sm font-medium text-theme-primary">Feature Toggles</h4>
                 {[
                   { key: 'enableSearch', label: 'Enable Search' },
                   { key: 'enableCollections', label: 'Enable Collections' },
@@ -508,7 +508,7 @@ export default function AdminPage() {
                   { key: 'enableDownload', label: 'Enable Download' },
                   { key: 'enableUpload', label: 'Enable Upload' },
                 ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-3 text-white">
+                  <label key={key} className="flex items-center gap-3 text-theme-primary">
                     <input
                       type="checkbox"
                       checked={localSettings[key] !== false}
@@ -525,7 +525,7 @@ export default function AdminPage() {
           {activeTab === 'advanced' && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
+                <label className="block text-sm font-medium text-theme-primary mb-2">
                   Custom CSS
                 </label>
                 <textarea
@@ -534,7 +534,7 @@ export default function AdminPage() {
                   className="w-full h-64 px-3 py-2 bg-art-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent font-mono text-sm"
                   placeholder="/* Add custom CSS here */&#10;.my-custom-class {&#10;  color: #fff;&#10;}"
                 />
-                <p className="mt-2 text-sm text-art-gray-400">
+                <p className="mt-2 text-sm text-theme-secondary">
                   Add custom CSS to further customize the appearance. Use with caution.
                 </p>
               </div>
@@ -601,40 +601,40 @@ export default function AdminPage() {
                   {localSettings.redisEnabled && (
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
-                        <label className="block text-sm font-medium text-white mb-2">
+                        <label className="block text-sm font-medium text-theme-primary mb-2">
                           Redis Host
                         </label>
                         <input
                           type="text"
                           value={localSettings.redisHost || 'localhost'}
                           onChange={(e) => setLocalSettings({ ...localSettings, redisHost: e.target.value })}
-                          className="w-full px-3 py-2 bg-art-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                          className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                           placeholder="localhost"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-white mb-2">
+                        <label className="block text-sm font-medium text-theme-primary mb-2">
                           Redis Port
                         </label>
                         <input
                           type="text"
                           value={localSettings.redisPort || '6379'}
                           onChange={(e) => setLocalSettings({ ...localSettings, redisPort: e.target.value })}
-                          className="w-full px-3 py-2 bg-art-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                          className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                           placeholder="6379"
                         />
                       </div>
                       
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-white mb-2">
+                        <label className="block text-sm font-medium text-theme-primary mb-2">
                           Redis Password (Optional)
                         </label>
                         <input
                           type="password"
                           value={localSettings.redisPassword || ''}
                           onChange={(e) => setLocalSettings({ ...localSettings, redisPassword: e.target.value })}
-                          className="w-full px-3 py-2 bg-art-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                          className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                           placeholder="Leave empty if no password"
                         />
                       </div>
@@ -643,7 +643,7 @@ export default function AdminPage() {
                   
                   {/* Redis Status from Cache API */}
                   {cacheStatus?.redis_status && (
-                    <div className="mt-4 p-3 bg-art-gray-700 rounded-lg">
+                    <div className="mt-4 p-3 bg-theme-tertiary rounded-lg">
                       <div className="flex items-center gap-2">
                         <div className={cn(
                           "w-2 h-2 rounded-full",
@@ -653,7 +653,7 @@ export default function AdminPage() {
                           Redis: {cacheStatus.redis_status.connected ? 'Connected' : 'Disconnected'}
                         </span>
                         {cacheStatus.redis_status.connected && (
-                          <span className="text-sm text-art-gray-400">
+                          <span className="text-sm text-theme-secondary">
                             ({cacheStatus.redis_status.keys} keys, {(cacheStatus.redis_status.memory_used / 1024 / 1024).toFixed(1)} MB)
                           </span>
                         )}
@@ -668,7 +668,7 @@ export default function AdminPage() {
                 <h3 className="text-lg font-medium text-white mb-4">Cache Settings</h3>
                 <div className="grid grid-cols-2 gap-4 p-4 bg-art-gray-800 rounded-lg">
                   <div>
-                    <label className="block text-sm font-medium text-white mb-2">
+                    <label className="block text-sm font-medium text-theme-primary mb-2">
                       Media Cache TTL (days)
                     </label>
                     <input
@@ -677,12 +677,12 @@ export default function AdminPage() {
                       max="30"
                       value={localSettings.mediaCacheTtlDays || 7}
                       onChange={(e) => setLocalSettings({ ...localSettings, mediaCacheTtlDays: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 bg-art-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-white mb-2">
+                    <label className="block text-sm font-medium text-theme-primary mb-2">
                       Max Cache Size (MB)
                     </label>
                     <input
@@ -690,7 +690,7 @@ export default function AdminPage() {
                       min="100"
                       value={localSettings.maxCacheSizeMb || 10240}
                       onChange={(e) => setLocalSettings({ ...localSettings, maxCacheSizeMb: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 bg-art-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
+                      className="w-full px-3 py-2 input-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-art-accent"
                     />
                   </div>
                 </div>
@@ -699,10 +699,10 @@ export default function AdminPage() {
               {/* System Status */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-white">System Status</h3>
+                  <h3 className="text-lg font-medium text-theme-primary">System Status</h3>
                   <div className="flex items-center gap-2">
                     {/* Filter buttons */}
-                    <div className="flex gap-1 bg-art-gray-800 rounded-lg p-1">
+                    <div className="flex gap-1 bg-theme-tertiary rounded-lg p-1">
                       {['all', 'failures', 'warnings'].map((filter) => (
                         <button
                           key={filter}
@@ -711,7 +711,7 @@ export default function AdminPage() {
                             "px-3 py-1 text-sm rounded transition-colors capitalize",
                             statusFilter === filter
                               ? "bg-art-accent text-white"
-                              : "text-art-gray-400 hover:text-white"
+                              : "text-theme-secondary hover:text-theme-primary"
                           )}
                         >
                           {filter}
@@ -722,7 +722,7 @@ export default function AdminPage() {
                     <button
                       onClick={fetchSystemStatuses}
                       disabled={isLoadingStatus}
-                      className="p-2 bg-art-gray-800 hover:bg-art-gray-700 text-white rounded-lg transition-colors"
+                      className="p-2 btn-theme-secondary rounded-lg transition-colors"
                     >
                       {isLoadingStatus ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -750,7 +750,7 @@ export default function AdminPage() {
                       .map(([key, value]) => (
                         <div
                           key={key}
-                          className="p-4 bg-art-gray-800 rounded-lg border border-art-gray-700"
+                          className="p-4 bg-theme-tertiary rounded-lg border border-theme-secondary"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -760,7 +760,7 @@ export default function AdminPage() {
                                 ) : (
                                   <AlertCircle className="h-5 w-5 text-red-500" />
                                 )}
-                                <h4 className="font-medium text-white">{value.name || key}</h4>
+                                <h4 className="font-medium text-theme-primary">{value.name || key}</h4>
                                 <span className={cn(
                                   "px-2 py-0.5 text-xs rounded-full",
                                   value.status === 'OK' 
@@ -781,7 +781,7 @@ export default function AdminPage() {
                                 )}
                               </div>
                               {value.info && (
-                                <p className="mt-1 text-sm text-art-gray-400">{value.info}</p>
+                                <p className="mt-1 text-sm text-theme-secondary">{value.info}</p>
                               )}
                             </div>
                           </div>
@@ -789,39 +789,39 @@ export default function AdminPage() {
                       ))}
                   </div>
                 ) : (
-                  <div className="text-center p-8 text-art-gray-400">
+                  <div className="text-center p-8 text-theme-secondary">
                     Click refresh to load system status
                   </div>
                 )}
                 
                 {/* Cache Status Summary */}
                 {cacheStatus && (
-                  <div className="mt-6 p-4 bg-art-gray-800 rounded-lg">
+                  <div className="mt-6 p-4 bg-theme-tertiary rounded-lg">
                     <h4 className="font-medium text-white mb-3">Cache Status</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <div className="text-2xl font-bold text-white">
                           {cacheStatus.cache_stats.total_resources}
                         </div>
-                        <div className="text-sm text-art-gray-400">Cached Resources</div>
+                        <div className="text-sm text-theme-secondary">Cached Resources</div>
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-white">
                           {cacheStatus.cache_stats.total_hits}
                         </div>
-                        <div className="text-sm text-art-gray-400">Cache Hits</div>
+                        <div className="text-sm text-theme-secondary">Cache Hits</div>
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-white">
                           {(cacheStatus.cache_stats.cache_directory_size / 1024 / 1024).toFixed(1)} MB
                         </div>
-                        <div className="text-sm text-art-gray-400">Disk Usage</div>
+                        <div className="text-sm text-theme-secondary">Disk Usage</div>
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-white">
                           {cacheStatus.cache_stats.cached_files.count}
                         </div>
-                        <div className="text-sm text-art-gray-400">Media Files</div>
+                        <div className="text-sm text-theme-secondary">Media Files</div>
                       </div>
                     </div>
                     
@@ -834,31 +834,31 @@ export default function AdminPage() {
                             <div className="text-lg font-bold text-green-400">
                               {cacheStatus.redis_status.hits}
                             </div>
-                            <div className="text-xs text-art-gray-400">Redis Hits</div>
+                            <div className="text-xs text-theme-secondary">Redis Hits</div>
                           </div>
                           <div>
                             <div className="text-lg font-bold text-yellow-400">
                               {cacheStatus.redis_status.misses}
                             </div>
-                            <div className="text-xs text-art-gray-400">Redis Misses</div>
+                            <div className="text-xs text-theme-secondary">Redis Misses</div>
                           </div>
                           <div>
                             <div className="text-lg font-bold text-blue-400">
                               {cacheStatus.redis_status.keys}
                             </div>
-                            <div className="text-xs text-art-gray-400">Cached Keys</div>
+                            <div className="text-xs text-theme-secondary">Cached Keys</div>
                           </div>
                           <div>
                             <div className="text-lg font-bold text-purple-400">
                               {((cacheStatus.redis_status.hits / (cacheStatus.redis_status.hits + cacheStatus.redis_status.misses)) * 100).toFixed(1)}%
                             </div>
-                            <div className="text-xs text-art-gray-400">Redis Hit Rate</div>
+                            <div className="text-xs text-theme-secondary">Redis Hit Rate</div>
                           </div>
                         </div>
                       </div>
                     )}
                     
-                    <div className="mt-4 text-xs text-art-gray-400">
+                    <div className="mt-4 text-xs text-theme-secondary">
                       <p>💡 Hit rate improves over time as more resources are cached. First-time resource views are always misses.</p>
                     </div>
                   </div>
@@ -869,12 +869,12 @@ export default function AdminPage() {
                   <div className="mt-4">
                     <button
                       onClick={() => setShowJsonPayload(!showJsonPayload)}
-                      className="text-sm text-art-gray-400 hover:text-white transition-colors"
+                      className="text-sm text-theme-secondary hover:text-white transition-colors"
                     >
                       {showJsonPayload ? 'Hide' : 'Show'} JSON Payload
                     </button>
                     {showJsonPayload && (
-                      <pre className="mt-2 p-4 bg-art-gray-900 rounded-lg text-xs text-art-gray-400 overflow-auto">
+                      <pre className="mt-2 p-4 bg-art-gray-900 rounded-lg text-xs text-theme-secondary overflow-auto">
                         {JSON.stringify(systemStatus, null, 2)}
                       </pre>
                     )}
@@ -889,14 +889,14 @@ export default function AdminPage() {
         <div className="px-6 py-4 border-t border-art-gray-800 flex items-center justify-end gap-4">
           <button
             onClick={() => navigate('/')}
-            className="px-4 py-2 text-art-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-theme-secondary hover:text-theme-primary transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isLoading || isSaving}
-            className="flex items-center gap-2 px-6 py-2 bg-art-accent hover:bg-art-accent-dark text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2 btn-theme-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
             {isSaving ? 'Saving...' : 'Save Changes'}

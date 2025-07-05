@@ -59,30 +59,30 @@ function ColumnConfigModal({ isOpen, onClose, columns, onSave }) {
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-art-gray-900 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-        <h2 className="text-xl font-bold text-white mb-4">Configure Table Columns</h2>
+      <div className="modal-theme rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <h2 className="text-xl font-bold text-theme-primary mb-4">Configure Table Columns</h2>
         
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-2 mb-4">
-            <h3 className="text-sm font-medium text-art-gray-400">Active Columns</h3>
+            <h3 className="text-sm font-medium text-theme-secondary">Active Columns</h3>
             {selectedColumns.map((col, index) => (
-              <div key={col.id} className="flex items-center justify-between bg-art-gray-800 p-3 rounded">
-                <span className="text-white">
+              <div key={col.id} className="flex items-center justify-between bg-theme-tertiary p-3 rounded">
+                <span className="text-theme-primary">
                   {col.label}
-                  {col.required && <span className="text-art-gray-500 text-xs ml-2">(Required)</span>}
+                  {col.required && <span className="text-theme-tertiary text-xs ml-2">(Required)</span>}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => moveColumn(index, 'up')}
                     disabled={index === 0}
-                    className="p-1 text-art-gray-400 hover:text-white disabled:opacity-50"
+                    className="p-1 text-theme-secondary hover:text-theme-primary disabled:opacity-50"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => moveColumn(index, 'down')}
                     disabled={index === selectedColumns.length - 1}
-                    className="p-1 text-art-gray-400 hover:text-white disabled:opacity-50"
+                    className="p-1 text-theme-secondary hover:text-theme-primary disabled:opacity-50"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </button>
@@ -110,16 +110,16 @@ function ColumnConfigModal({ isOpen, onClose, columns, onSave }) {
           </div>
         </div>
         
-        <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-art-gray-800">
+        <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-theme-primary">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-art-gray-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-theme-secondary hover:text-theme-primary transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-art-accent text-white rounded hover:bg-art-accent-dark transition-colors"
+            className="px-4 py-2 btn-theme-primary rounded transition-colors"
           >
             Save Changes
           </button>
@@ -288,19 +288,19 @@ export default function ResourceTable({ resources, showUser = true, onSort, sort
   return (
     <div className="w-full">
       <div className="overflow-x-auto">
-        <table ref={tableRef} className="w-full bg-art-gray-900 rounded-lg overflow-hidden table-fixed">
+        <table ref={tableRef} className="w-full card-theme rounded-lg overflow-hidden table-fixed">
           <thead>
-            <tr className="bg-art-gray-800 border-b border-art-gray-700">
+            <tr className="bg-theme-tertiary border-b border-theme-secondary">
               {columns.map((col, index) => (
                 <th
                   key={col.id}
-                  className="relative px-4 py-3 text-left text-sm font-medium text-art-gray-300"
+                  className="relative px-4 py-3 text-left text-sm font-medium text-theme-secondary"
                   style={{ width: col.width }}
                 >
                   <div
                     className={cn(
                       "flex items-center gap-2 pr-4",
-                      col.field !== 'thumbnail' && "cursor-pointer hover:text-white"
+                      col.field !== 'thumbnail' && "cursor-pointer hover:text-theme-primary"
                     )}
                     onClick={() => col.field !== 'thumbnail' && handleSort(col.field)}
                   >
@@ -316,7 +316,7 @@ export default function ResourceTable({ resources, showUser = true, onSort, sort
                     onMouseDown={handleMouseDown(index)}
                     onDoubleClick={handleDoubleClick(index)}
                   >
-                    <div className="w-0.5 h-full bg-art-gray-600 group-hover:bg-art-accent transition-colors" />
+                    <div className="w-0.5 h-full bg-theme-secondary group-hover:bg-art-accent transition-colors" />
                   </div>
                 </th>
               ))}
@@ -326,7 +326,7 @@ export default function ResourceTable({ resources, showUser = true, onSort, sort
             {resources.map((resource, index) => (
               <tr
                 key={resource.ref}
-                className="border-b border-art-gray-800 hover:bg-art-gray-800/50 transition-colors"
+                className="border-b border-theme-primary bg-theme-hover transition-colors"
               >
                 {columns.map(col => (
                   <td 
@@ -337,7 +337,7 @@ export default function ResourceTable({ resources, showUser = true, onSort, sort
                     {col.field === 'thumbnail' ? (
                       <button
                         onClick={() => onResourceClick && onResourceClick(resource, index)}
-                        className="block w-12 h-12 bg-art-gray-800 rounded overflow-hidden"
+                        className="block w-12 h-12 bg-theme-tertiary rounded overflow-hidden"
                       >
                         <img
                           src={getResourcePreviewUrl(resource.ref, 'thm')}
@@ -349,13 +349,13 @@ export default function ResourceTable({ resources, showUser = true, onSort, sort
                     ) : col.field === 'field8' || col.field === 'title' ? (
                       <button
                         onClick={() => onResourceClick && onResourceClick(resource, index)}
-                        className="text-white hover:text-art-accent transition-colors block truncate text-left w-full"
+                        className="text-theme-primary hover:text-art-accent transition-colors block truncate text-left w-full"
                         title={getCellValue(resource, col.field)}
                       >
                         {getCellValue(resource, col.field)}
                       </button>
                     ) : (
-                      <span className="text-art-gray-300 text-sm block truncate" title={getCellValue(resource, col.field)}>
+                      <span className="text-theme-secondary text-sm block truncate" title={getCellValue(resource, col.field)}>
                         {getCellValue(resource, col.field)}
                       </span>
                     )}

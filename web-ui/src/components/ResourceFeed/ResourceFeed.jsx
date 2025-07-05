@@ -310,7 +310,7 @@ export default function ResourceFeed({
   }
 
   return (
-    <div className="min-h-screen bg-art-dark">
+    <div className="min-h-screen bg-theme-primary">
       {/* Floating Search Bar */}
       <FloatingSearchBar
         initialQuery={searchQuery}
@@ -347,9 +347,9 @@ export default function ResourceFeed({
           </div>
         ) : resources.length === 0 ? (
           <div className="text-center py-12">
-            <i className="fas fa-search text-6xl text-art-gray-600 mb-4"></i>
-            <p className="text-xl text-art-gray-400">No resources found</p>
-            <p className="text-art-gray-600 mt-2">Try adjusting your search or filters</p>
+            <i className="fas fa-search text-6xl text-theme-tertiary mb-4"></i>
+            <p className="text-xl text-theme-secondary">No resources found</p>
+            <p className="text-theme-tertiary mt-2">Try adjusting your search or filters</p>
           </div>
         ) : viewMode === VIEW_MODES.LIST ? (
           <>
