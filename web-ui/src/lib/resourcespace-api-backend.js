@@ -385,6 +385,18 @@ export const resourceSpaceApi = {
     }
   },
 
+  getResourceLog: async (ref, sessionKey) => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/resource/${ref}/log`, {
+        params: { sessionKey }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting resource log:', error);
+      throw error;
+    }
+  },
+
   // Delete alternative file
   deleteAlternativeFile: async (ref, fileId, sessionKey) => {
     try {

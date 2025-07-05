@@ -23,6 +23,7 @@ const {
   getCacheStats,
   evictResource
 } = require('./cache-integration');
+const annotationsDb = require('./database/annotations');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,7 +42,7 @@ app.use('/uploads/profile_pics', express.static(path.join(__dirname, 'uploads/pr
 
 // Test endpoint
 app.get('/test', (req, res) => {
-  res.json({ status: 'ok', message: 'Backend is working!' });
+  res.json({ status: 'ok', message: 'Backend is working!', timestamp: Date.now() });
 });
 
 // Debug endpoint to test URL generation
@@ -1159,6 +1160,168 @@ app.post('/api/resource/:ref/alternative-files', async (req, res) => {
   }
 });
 
+// Get available sizes for alternative file
+app.get('/api/alternative/:altId/sizes', async (req, res) => {
+  try {
+    const { altId } = req.params;
+    const { resourceRef } = req.query;
+    
+    // First try with just the alternative file ID
+    let params = new URLSearchParams({
+      function: 'get_resource_all_image_sizes',
+      param1: altId // try alternative file ID directly
+    });
+    
+    let query = `user=${RS_USER}&${params.toString()}`;
+    let sign = signRequest(query);
+    
+    console.log(`Checking sizes for alternative file ${altId} directly...`);
+    let response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`);
+    
+    // If no sizes found and we have a parent resource ref, try that
+    if ((!response.data || response.data.length === 0) && resourceRef) {
+      console.log(`No sizes found for alt file ${altId}, trying parent resource ${resourceRef}...`);
+      params = new URLSearchParams({
+        function: 'get_resource_all_image_sizes',
+        param1: resourceRef // try parent resource ID
+      });
+      
+      query = `user=${RS_USER}&${params.toString()}`;
+      sign = signRequest(query);
+      response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`);
+    }
+    
+    console.log(`Sizes response:`, response.data);
+    res.json(response.data || []);
+  } catch (error) {
+    console.error('Error getting alternative file sizes:', error);
+    res.status(500).json({ success: false, error: 'Failed to get alternative file sizes' });
+  }
+});
+
+// Get alternative file preview - using API to get authenticated URL
+app.get('/api/alternative/:altId/preview', async (req, res) => {
+  try {
+    const { altId } = req.params;
+    const { size = 'scr', resourceRef } = req.query;
+    
+    if (!resourceRef) {
+      return res.status(400).json({ success: false, error: 'Parent resource ref is required' });
+    }
+    
+    // Use get_resource_path API to get authenticated URL
+    const params = new URLSearchParams({
+      function: 'get_resource_path',
+      param1: resourceRef, // parent resource ref
+      param3: size, // size
+      param5: 'jpg', // extension
+      param8: altId // alternative file ID
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    console.log(`Getting alternative file preview path: ref=${resourceRef}, alt=${altId}, size=${size}`);
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`);
+    
+    if (response.data && response.data !== false && response.data !== 'false') {
+      console.log('Got authenticated URL:', response.data);
+      // Redirect to the authenticated URL
+      res.redirect(response.data);
+    } else {
+      // Fallback to direct download URL
+      const downloadParams = new URLSearchParams({
+        ref: resourceRef,
+        size: size,
+        ext: 'jpg',
+        page: '1',
+        alternative: altId,
+        watermarked: '',
+        k: '',
+        noattach: 'true'
+      });
+      
+      const downloadUrl = `https://mscrnt.free.resourcespace.com/pages/download.php?${downloadParams.toString()}`;
+      console.log('Fallback to direct URL:', downloadUrl);
+      res.redirect(downloadUrl);
+    }
+  } catch (error) {
+    console.error('Error getting alternative file preview:', error);
+    res.status(500).json({ success: false, error: 'Failed to get alternative file preview' });
+  }
+});
+
+// Get alternative file download - proxy download with proper headers
+app.get('/api/alternative/:altId/file', async (req, res) => {
+  try {
+    const { altId } = req.params;
+    const { resourceRef, extension = 'jpg', download = 'true' } = req.query;
+    
+    if (!resourceRef) {
+      return res.status(400).json({ success: false, error: 'Parent resource ref is required' });
+    }
+    
+    // Use get_resource_path API to get authenticated URL
+    const params = new URLSearchParams({
+      function: 'get_resource_path',
+      param1: resourceRef, // parent resource ref
+      param3: '', // size - empty for original
+      param5: extension, // extension
+      param8: altId // alternative file ID
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    console.log(`Getting alternative file path: ref=${resourceRef}, alt=${altId}, ext=${extension}`);
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`);
+    
+    if (response.data && response.data !== false && response.data !== 'false') {
+      const fileUrl = response.data;
+      console.log('Got authenticated URL:', fileUrl);
+      
+      // Get the alternative file info to get the filename
+      const altFilesParams = new URLSearchParams({
+        function: 'get_alternative_files',
+        param1: resourceRef
+      });
+      
+      const altFilesQuery = `user=${RS_USER}&${altFilesParams.toString()}`;
+      const altFilesSign = signRequest(altFilesQuery);
+      
+      const altFilesResponse = await axios.get(`${RS_API_URL}?${altFilesQuery}&sign=${altFilesSign}`);
+      const altFiles = Array.isArray(altFilesResponse.data) ? altFilesResponse.data : [];
+      const altFile = altFiles.find(f => f.ref == altId);
+      const fileName = altFile ? altFile.name : `alternative_${altId}.${extension}`;
+      
+      // If download is requested, proxy the file with download headers
+      if (download === 'true') {
+        const fileResponse = await axios.get(fileUrl, {
+          responseType: 'stream'
+        });
+        
+        // Set headers to force download
+        res.setHeader('Content-Type', fileResponse.headers['content-type'] || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        if (fileResponse.headers['content-length']) {
+          res.setHeader('Content-Length', fileResponse.headers['content-length']);
+        }
+        
+        // Pipe the file to the response
+        fileResponse.data.pipe(res);
+      } else {
+        // Just redirect for preview
+        res.redirect(fileUrl);
+      }
+    } else {
+      res.status(404).json({ success: false, error: 'Alternative file not found' });
+    }
+  } catch (error) {
+    console.error('Error getting alternative file:', error);
+    res.status(500).json({ success: false, error: 'Failed to get alternative file' });
+  }
+});
+
 // Delete alternative file
 app.delete('/api/resource/:ref/alternative-file/:fileId', async (req, res) => {
   try {
@@ -1187,6 +1350,29 @@ app.delete('/api/resource/:ref/alternative-file/:fileId', async (req, res) => {
   } catch (error) {
     console.error('Error deleting alternative file:', error);
     res.status(500).json({ success: false, error: 'Failed to delete alternative file' });
+  }
+});
+
+// Get resource log
+app.get('/api/resource/:ref/log', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { sessionKey } = req.query;
+    
+    const params = new URLSearchParams({
+      function: 'get_resource_log',
+      param1: ref
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`);
+    
+    res.json(response.data || []);
+  } catch (error) {
+    console.error('Error getting resource log:', error);
+    res.status(500).json({ success: false, error: 'Failed to get resource log' });
   }
 });
 
@@ -1516,6 +1702,266 @@ app.delete('/api/cache/resource/:ref', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to evict resource'
+    });
+  }
+});
+
+// Annotation API endpoints
+
+// Save annotation metadata
+app.post('/api/annotations', async (req, res) => {
+  try {
+    const { resourceId, resourceType, annotationsJson, frame, timestamp, createdBy } = req.body;
+    
+    if (!resourceId || !annotationsJson) {
+      return res.status(400).json({
+        success: false,
+        error: 'Resource ID and annotations JSON are required'
+      });
+    }
+    
+    const result = annotationsDb.saveAnnotation(
+      resourceId,
+      resourceType,
+      annotationsJson,
+      { frame, timestamp, createdBy }
+    );
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error saving annotation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save annotation'
+    });
+  }
+});
+
+// Get annotations for a resource
+app.get('/api/annotations/:resourceId', async (req, res) => {
+  try {
+    const { resourceId } = req.params;
+    const annotations = annotationsDb.getLatestAnnotation(resourceId);
+    
+    res.json({
+      success: true,
+      annotations
+    });
+  } catch (error) {
+    console.error('Error getting annotations:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get annotations'
+    });
+  }
+});
+
+// Get all annotations for a resource
+app.get('/api/annotations/:resourceId/all', async (req, res) => {
+  try {
+    const { resourceId } = req.params;
+    const annotations = annotationsDb.getAnnotationsByResource(resourceId);
+    
+    res.json({
+      success: true,
+      annotations
+    });
+  } catch (error) {
+    console.error('Error getting all annotations:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get annotations'
+    });
+  }
+});
+
+// Update annotation
+app.put('/api/annotations/:annotationId', async (req, res) => {
+  try {
+    const { annotationId } = req.params;
+    const { annotationsJson } = req.body;
+    
+    if (!annotationsJson) {
+      return res.status(400).json({
+        success: false,
+        error: 'Annotations JSON is required'
+      });
+    }
+    
+    const result = annotationsDb.updateAnnotation(annotationId, annotationsJson);
+    res.json(result);
+  } catch (error) {
+    console.error('Error updating annotation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update annotation'
+    });
+  }
+});
+
+// Delete annotation
+app.delete('/api/annotations/:annotationId', async (req, res) => {
+  try {
+    const { annotationId } = req.params;
+    const result = annotationsDb.deleteAnnotation(annotationId);
+    res.json(result);
+  } catch (error) {
+    console.error('Error deleting annotation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete annotation'
+    });
+  }
+});
+
+// Upload alternative file endpoint
+const alternativeFileUpload = multer({ 
+  storage: multer.diskStorage({
+    destination: function (req, file, cb) {
+      const uploadPath = path.join(__dirname, 'temp_uploads');
+      if (!fs.existsSync(uploadPath)) {
+        fs.mkdirSync(uploadPath, { recursive: true });
+      }
+      cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
+app.post('/api/alternative-file', alternativeFileUpload.single('file'), async (req, res) => {
+  let tempFilePath = null;
+  
+  try {
+    const { resource, name, description, alt_type } = req.body;
+    const file = req.file;
+    
+    if (!file || !resource || !name) {
+      return res.status(400).json({
+        success: false,
+        error: 'File, resource ID, and name are required'
+      });
+    }
+    
+    tempFilePath = file.path;
+    
+    // Step 1: Create the alternative file entry using add_alternative_file
+    const fileName = file.originalname || `annotation_${resource}_${Date.now()}.jpg`;
+    const fileExtension = alt_type === 'annotation' ? 'jpg' : path.extname(fileName).slice(1) || 'jpg';
+    
+    const params = new URLSearchParams({
+      function: 'add_alternative_file',
+      param1: resource, // resource ref
+      param2: name, // name (required) - descriptive name
+      param3: description || '', // description
+      param4: fileName, // file_name - actual filename
+      param5: fileExtension, // file_extension
+      param6: file.size.toString(), // file_size in bytes (must be string)
+      param7: alt_type || 'annotation' // alt_type for grouping
+    });
+    
+    const query = `user=${RS_USER}&${params.toString()}`;
+    const sign = signRequest(query);
+    
+    console.log('Step 1: Creating alternative file entry...');
+    console.log('Parameters:', {
+      resource: resource,
+      name: name,
+      description: description,
+      fileName: fileName,
+      fileExtension: fileExtension,
+      fileSize: file.size,
+      alt_type: alt_type
+    });
+    console.log('API URL:', `${RS_API_URL}?${query}&sign=${sign}`);
+    
+    const response = await axios.get(`${RS_API_URL}?${query}&sign=${sign}`);
+    console.log('add_alternative_file response:', response.data);
+    
+    if (!response.data || response.data === false || response.data === 'false') {
+      throw new Error('Failed to create alternative file entry');
+    }
+    
+    const alternativeFileId = response.data;
+    
+    // Step 2: Upload the actual file using upload_multipart
+    // Build the query string for the signature (including user)
+    const uploadQueryData = {
+      user: RS_USER,
+      function: 'upload_multipart',
+      ref: resource,
+      no_exif: 1,
+      revert: 0,
+      alternative: alternativeFileId  // This is the key parameter for alternative files
+    };
+    
+    // Create query string in the exact order
+    const uploadQuery = Object.entries(uploadQueryData)
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&');
+    
+    // Sign the query
+    const uploadSign = signRequest(uploadQuery);
+    
+    // Prepare multipart form data
+    const formData = new FormData();
+    formData.append('query', uploadQuery);
+    formData.append('sign', uploadSign);
+    formData.append('user', RS_USER);
+    formData.append('file', fs.createReadStream(tempFilePath), {
+      filename: fileName,
+      contentType: 'image/jpeg'
+    });
+    
+    console.log('Step 2: Uploading file to alternative file ID:', alternativeFileId);
+    console.log('Upload query:', uploadQuery);
+    
+    const uploadResponse = await axios.post(RS_API_URL, formData, {
+      headers: {
+        ...formData.getHeaders()
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    });
+    
+    console.log('upload_multipart response status:', uploadResponse.status);
+    
+    // Clean up temp file
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+    
+    // Check if upload was successful (204 status expected)
+    if (uploadResponse.status === 204 || uploadResponse.status === 200) {
+      res.json({
+        success: true,
+        data: {
+          ref: alternativeFileId,
+          message: 'Alternative file created and uploaded successfully'
+        }
+      });
+    } else {
+      throw new Error(`Upload failed with status ${uploadResponse.status}`);
+    }
+  } catch (error) {
+    console.error('Error handling alternative file:', error);
+    console.error('Error details:', error.response?.data);
+    console.error('Error stack:', error.stack);
+    console.error('Request body:', req.body);
+    console.error('File info:', req.file);
+    
+    // Clean up temp file on error
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to handle alternative file',
+      details: error.response?.data
     });
   }
 });

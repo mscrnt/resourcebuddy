@@ -39,7 +39,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY entrypoint.py /app/entrypoint.py
 
 # Copy supervisor config
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Create necessary directories
 RUN mkdir -p /var/log/supervisor

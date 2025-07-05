@@ -182,6 +182,75 @@ The system builds ResourceSpace-compatible queries:
 - Consistent search behavior
 - Extensible for new field types
 
+## Technical Details & Implementation Notes
+
+### ResourceSpace Search Syntax Implementation
+
+The system generates proper ResourceSpace-compatible search queries following exact syntax requirements:
+
+#### Special Searches (must come first)
+- `!duplicates` - Find duplicate resources
+- `!nodownloads` - Never downloaded resources  
+- `!empty[fieldId]` - Resources with empty field
+- `!hasdata[fieldId]` - Resources with data in field
+
+#### Keywords
+- All words: `+word1 +word2` (each word prefixed with +)
+- Any words: `word1 word2` (no prefix needed)
+- Exact phrase: `"exact phrase"`
+- Exclude: `-word1 -word2` (each word prefixed with -)
+
+#### Field-Specific Searches
+- Single value: `fieldname:"value"`
+- Multiple values (OR): `fieldname:value1;value2;value3`
+- Exclude value: `-fieldname:"value"`
+- Date range: `fieldname:rangestart2019-01-01end2019-12-31`
+- Date after: `fieldname:rangestart2019-01-01`
+- Date before: `fieldname:rangeend2019-12-31`
+
+#### File Attributes
+- File types: `extension:jpg;png;pdf`
+- File size range: `filesize:1048576..10485760` (in bytes)
+- File size min: `filesize:>1048576`
+- File size max: `filesize:<10485760`
+- Image dimensions: `imagewidth:>1920 imageheight:>1080`
+
+### Recent Fixes and Updates
+
+#### 1. Search/Cancel Buttons in Advanced Mode
+- Added footer with Search and Cancel buttons to Advanced mode
+- Consistent UI experience across both Guided and Advanced modes
+
+#### 2. Tooltip Overflow Fix
+- Tooltips now use React Portal rendering to document body
+- Increased z-index to 10000 for proper layering
+- Smart positioning keeps tooltips within viewport
+
+#### 3. Enhanced API Integration
+The `doSearch` function in resourcespace-api-backend.js:
+```javascript
+doSearch(search, restypes, orderBy, archive, fetchrows, sort, offset, sessionKey)
+```
+
+Parameters match ResourceSpace's do_search API exactly.
+
+### Complex Search Examples
+
+#### Marketing Materials from Europe
+```
++marketing country:spain;italy;france createdate:rangestart2024-01-01 extension:pdf;pptx
+```
+
+#### High-Resolution Photos (Not Stock)
+```
++photo -stock imagewidth:>3840 imageheight:>2160 !hasdata52
+```
+
+#### Recent Uploads by Team
+```
+contributedby:john;mary;susan createdate:rangestart2024-03-01 !duplicates
+```
+
 ## Future Enhancements
 - Search templates by role/department
 - Shared saved searches

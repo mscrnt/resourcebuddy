@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
-import { X, ChevronLeft, ChevronRight, Info, ZoomIn, ZoomOut, Maximize2, Share2, Edit2, Upload, MessageSquare, FileText, ChevronUp, ChevronDown, Check, XCircle, Save, Loader2, FolderPlus, FolderMinus, Expand } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { X, ChevronLeft, ChevronRight, Info, ZoomIn, ZoomOut, Maximize2, Share2, Edit2, Upload, MessageSquare, FileText, ChevronUp, ChevronDown, Check, XCircle, Save, Loader2, FolderPlus, FolderMinus, Expand, Edit3, Download, History } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '../lib/utils'
 import { useApi } from '../contexts/ApiContext'
@@ -8,8 +9,11 @@ import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
 import VideoPlayerPro from './VideoPlayerPro'
 import ImageViewer from './ImageViewer'
+import UniversalAnnotator from './UniversalAnnotator'
 import axios from 'axios'
 import { debounce, throttle, rafThrottle } from '../lib/performance-utils'
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 const ResourceModalEnhanced = memo(({ 
   resource, 
@@ -59,6 +63,11 @@ const ResourceModalEnhanced = memo(({
   const [isImageFullscreen, setIsImageFullscreen] = useState(false)
   const [availableSpace, setAvailableSpace] = useState({ width: 0, height: 0 })
   const [resourceData, setResourceData] = useState(null)
+  const [showAnnotator, setShowAnnotator] = useState(false)
+  const [alternativeFilesCollapsed, setAlternativeFilesCollapsed] = useState(false)
+  const [hoveredAltFile, setHoveredAltFile] = useState(null)
+  const [showResourceLog, setShowResourceLog] = useState(false)
+  const [resourceLog, setResourceLog] = useState([])
   
   // Memoize organized metadata sections to avoid expensive recalculation
   const organizedMetadataSections = useMemo(() => {
@@ -244,6 +253,16 @@ const ResourceModalEnhanced = memo(({
     } catch (err) {
       console.error('Failed to load alternative files:', err)
       setAlternativeFiles([])
+    }
+  }
+
+  const loadResourceLog = async () => {
+    try {
+      const response = await api.getResourceLog(resource.ref)
+      setResourceLog(response || [])
+    } catch (err) {
+      console.error('Failed to load resource log:', err)
+      setResourceLog([])
     }
   }
 
@@ -613,13 +632,14 @@ const ResourceModalEnhanced = memo(({
   if (!isOpen) return null
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm"
-        style={{
+    <>
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm"
+          style={{
           bottom: isCollectionBarVisible ? `${collectionBarHeight}px` : 0
         }}
         onClick={(e) => {
@@ -667,6 +687,20 @@ const ResourceModalEnhanced = memo(({
                   "pt-12 px-4 pb-6 h-full overflow-y-auto",
                   metadataWidth > 400 ? "px-6" : "px-4"
                 )}>
+                  {/* View Logs Button */}
+                  <div className="mb-4">
+                    <button
+                      onClick={() => {
+                        loadResourceLog();
+                        setShowResourceLog(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-art-gray-800 hover:bg-art-gray-700 text-white rounded-lg transition-colors"
+                    >
+                      <History className="h-4 w-4" />
+                      <span className="text-sm font-medium">View Activity Log</span>
+                    </button>
+                  </div>
+
                   {/* Resource Type */}
                   <div className="mb-6">
                       <div className="flex items-center justify-between mb-2">
@@ -807,28 +841,131 @@ const ResourceModalEnhanced = memo(({
 
                     {/* Alternative Files */}
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-art-gray-400 uppercase">Alternative Files</h3>
-                      {alternativeFiles.length > 0 ? (
-                        <ul className="space-y-1">
-                          {alternativeFiles.map((file, idx) => (
-                            <li key={idx} className="text-sm text-white flex items-center justify-between">
-                              <span className="truncate">{file.name}</span>
-                              <a
-                                href={file.url}
-                                download
-                                className="text-art-accent hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <FileText className="h-3 w-3" />
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-art-gray-500">No alternative files</p>
+                      <div 
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => setAlternativeFilesCollapsed(!alternativeFilesCollapsed)}
+                      >
+                        <h3 className="text-sm font-semibold text-art-gray-400 uppercase">
+                          Alternative Files {alternativeFiles.length > 0 && `(${alternativeFiles.length})`}
+                        </h3>
+                        {alternativeFilesCollapsed ? (
+                          <ChevronRight className="h-4 w-4 text-art-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-art-gray-400" />
+                        )}
+                      </div>
+                      
+                      {!alternativeFilesCollapsed && (
+                        <>
+                          {alternativeFiles.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              {alternativeFiles.map((file, idx) => {
+                                // Extract extension from filename if not provided
+                                const fileName = file.name || '';
+                                // Look for extension in various places
+                                let fileExtension = file.extension || file.file_extension || '';
+                                if (!fileExtension && fileName.includes('.')) {
+                                  // Extract from filename, handling cases like "file.png - Annotation ABC"
+                                  const match = fileName.match(/\.([a-zA-Z0-9]+)(\s|$|-)/);
+                                  if (match) {
+                                    fileExtension = match[1].toLowerCase();
+                                  }
+                                }
+                                // For annotations, they're saved as JPEG regardless of original extension
+                                if (file.alt_type === 'annotation') {
+                                  fileExtension = 'jpg';
+                                }
+                                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension);
+                                // Alternative files have their own ID (not ref)
+                                const altFileId = file.ref || file.alt_id || file.file_id || file.id;
+                                
+                                return (
+                                  <div 
+                                    key={altFileId || `alt-file-${idx}`} 
+                                    className="relative group"
+                                    onMouseEnter={() => {
+                                      console.log('Hovering over alt file:', {
+                                        isImage,
+                                        altFileId,
+                                        file,
+                                        fileName,
+                                        fileExtension
+                                      });
+                                      if (isImage && altFileId) {
+                                        setHoveredAltFile({ 
+                                          file, 
+                                          fileName, 
+                                          fileExtension, 
+                                          altFileId 
+                                        });
+                                      }
+                                    }}
+                                    onMouseLeave={() => setHoveredAltFile(null)}
+                                  >
+                                    <div className="relative w-[124px] h-[124px] bg-gray-100 dark:bg-art-gray-800 rounded-lg overflow-hidden border border-gray-300 dark:border-art-gray-600">
+                                      {isImage && altFileId ? (
+                                        <>
+                                          <img
+                                            src={`${BACKEND_URL}/api/alternative/${altFileId}/preview?size=thm&resourceRef=${resource.ref}`}
+                                            alt={fileName}
+                                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                            onError={(e) => {
+                                              // Try without size parameter (original)
+                                              if (!e.target.dataset.triedOriginal) {
+                                                e.target.dataset.triedOriginal = 'true';
+                                                e.target.src = `${BACKEND_URL}/api/alternative/${altFileId}/file?resourceRef=${resource.ref}&extension=${fileExtension}`;
+                                              } else {
+                                                e.target.style.display = 'none';
+                                                e.target.nextSibling.style.display = 'flex';
+                                              }
+                                            }}
+                                          />
+                                          <div className="hidden w-full h-full items-center justify-center">
+                                            <FileText className="h-8 w-8 text-art-gray-500" />
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <div className="flex w-full h-full items-center justify-center">
+                                          <FileText className="h-8 w-8 text-art-gray-500" />
+                                        </div>
+                                      )}
+                                      
+                                      {/* Overlay with file info */}
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute bottom-0 left-0 right-0 p-2">
+                                          <p className="text-xs text-white truncate">{fileName}</p>
+                                          {file.size && (
+                                            <p className="text-xs text-art-gray-300">{(file.size / 1024).toFixed(1)} KB</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Download button */}
+                                      <a
+                                        href={altFileId ? `${BACKEND_URL}/api/alternative/${altFileId}/file?resourceRef=${resource.ref}&extension=${fileExtension}` : '#'}
+                                        download
+                                        className="absolute top-2 right-2 p-1.5 bg-black/70 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/90"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!altFileId) e.preventDefault();
+                                        }}
+                                        title="Download"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                      </a>
+                                    </div>
+                                    
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-art-gray-500">No alternative files</p>
+                          )}
+                        </>
                       )}
                       
-                      {permissions.edit && (
+                      {!alternativeFilesCollapsed && permissions.edit && (
                         <>
                           <input
                             ref={variantInputRef}
@@ -953,6 +1090,20 @@ const ResourceModalEnhanced = memo(({
                   >
                     <Share2 className="h-4 w-4" />
                   </button>
+                  {mediaType === 'image' && (
+                    <button
+                      onClick={() => setShowAnnotator(!showAnnotator)}
+                      className={cn(
+                        "p-1.5 rounded-md transition-colors",
+                        showAnnotator 
+                          ? "bg-art-accent hover:bg-art-accent-dark text-white" 
+                          : "bg-white/10 hover:bg-white/20 text-white"
+                      )}
+                      title={showAnnotator ? "Close annotator" : "Annotate image"}
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </button>
+                  )}
                   <button
                     onClick={() => setIsImageFullscreen(!isImageFullscreen)}
                     className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
@@ -1078,6 +1229,180 @@ const ResourceModalEnhanced = memo(({
               </div>
             </div>
 
+            {/* Alternative File Preview Overlay - positioned within main content area */}
+            {hoveredAltFile ? (
+              <div 
+                className="absolute inset-0 z-30 flex items-center justify-center"
+                style={{
+                  top: '45px', // Account for header
+                  right: showMetadata ? `${metadataWidth}px` : '0',
+                  pointerEvents: 'none'
+                }}
+              >
+                <div 
+                  className="absolute inset-0 bg-black/60"
+                  style={{ pointerEvents: 'auto' }}
+                  onClick={() => setHoveredAltFile(null)}
+                />
+                <div className="relative bg-white/10 p-4 rounded-lg" style={{ pointerEvents: 'auto', maxWidth: '80%', maxHeight: '80%' }}>
+                  <div className="flex flex-col items-center justify-center">
+                    <img
+                      src={`${BACKEND_URL}/api/alternative/${hoveredAltFile.altFileId}/preview?size=pre&resourceRef=${resource.ref}`}
+                      alt={hoveredAltFile.fileName}
+                      className="block rounded-lg shadow-2xl"
+                      style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '60vh' }}
+                    onLoad={(e) => {
+                      console.log('Preview image loaded successfully:', {
+                        src: e.target.src,
+                        naturalWidth: e.target.naturalWidth,
+                        naturalHeight: e.target.naturalHeight,
+                        width: e.target.width,
+                        height: e.target.height,
+                        complete: e.target.complete
+                      });
+                    }}
+                    onError={(e) => {
+                      console.log('Preview image error:', {
+                        currentSrc: e.target.src,
+                        hoveredAltFile,
+                        resourceRef: resource.ref,
+                        BACKEND_URL
+                      });
+                      // Fallback cascade: scr -> pre -> original file
+                      if (!e.target.dataset.triedPre) {
+                        e.target.dataset.triedPre = 'true';
+                        const newSrc = `${BACKEND_URL}/api/alternative/${hoveredAltFile.altFileId}/preview?size=pre&resourceRef=${resource.ref}`;
+                        console.log('Trying pre size:', newSrc);
+                        e.target.src = newSrc;
+                      } else if (!e.target.dataset.triedOriginal) {
+                        e.target.dataset.triedOriginal = 'true';
+                        const newSrc = `${BACKEND_URL}/api/alternative/${hoveredAltFile.altFileId}/file?resourceRef=${resource.ref}&extension=${hoveredAltFile.fileExtension}`;
+                        console.log('Trying original file:', newSrc);
+                        e.target.src = newSrc;
+                      } else {
+                        console.error('All image sources failed');
+                      }
+                    }}
+                    />
+                  </div>
+                  <div className="mt-4 text-white bg-black/60 backdrop-blur-sm rounded-lg p-3">
+                    <p className="font-semibold">{hoveredAltFile.fileName}</p>
+                    {hoveredAltFile.file.description && (
+                      <p className="text-sm opacity-90 mt-1">{hoveredAltFile.file.description}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Resource Log Overlay */}
+            {showResourceLog && (
+              <div 
+                className="absolute inset-0 z-30 flex items-center justify-center"
+                style={{
+                  top: '45px',
+                  right: showMetadata ? `${metadataWidth}px` : '0'
+                }}
+              >
+                <div 
+                  className="absolute inset-0 bg-black/60"
+                  onClick={() => setShowResourceLog(false)}
+                />
+                <div className="relative max-w-4xl max-h-[80%] bg-art-gray-900 p-6 rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-white">Activity Log</h2>
+                    <button
+                      onClick={() => setShowResourceLog(false)}
+                      className="p-1 rounded hover:bg-art-gray-800 text-white"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="overflow-y-auto max-h-[60vh] space-y-3">
+                    {resourceLog.length > 0 ? (
+                      resourceLog.map((entry, idx) => {
+                        const date = new Date(entry.date);
+                        const logTypeLabels = {
+                          'c': 'Created',
+                          'u': 'Updated',
+                          'e': 'Edited',
+                          't': 'System',
+                          'd': 'Downloaded',
+                          'v': 'Viewed'
+                        };
+                        
+                        return (
+                          <div key={entry.ref || idx} className="bg-art-gray-800 p-4 rounded-lg">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={cn(
+                                  "px-2 py-1 text-xs rounded font-medium",
+                                  entry.type === 'c' && "bg-green-600/20 text-green-400",
+                                  entry.type === 'e' && "bg-blue-600/20 text-blue-400",
+                                  entry.type === 'u' && "bg-yellow-600/20 text-yellow-400",
+                                  entry.type === 't' && "bg-gray-600/20 text-gray-400"
+                                )}>
+                                  {logTypeLabels[entry.type] || entry.type}
+                                </span>
+                                <span className="text-sm text-art-gray-400">
+                                  {date.toLocaleDateString()} {date.toLocaleTimeString()}
+                                </span>
+                              </div>
+                              <span className="text-sm text-art-gray-500">
+                                {entry.fullname || entry.username}
+                              </span>
+                            </div>
+                            
+                            {entry.title && (
+                              <div className="text-sm font-medium text-white mb-1">
+                                {entry.title}
+                              </div>
+                            )}
+                            
+                            {entry.diff && (
+                              <div className="text-sm text-art-gray-300 whitespace-pre-wrap">
+                                {entry.diff}
+                              </div>
+                            )}
+                            
+                            {entry.notes && (
+                              <div className="text-sm text-art-gray-400 mt-2">
+                                {entry.notes}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center text-art-gray-500 py-8">
+                        No activity log available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Annotation Overlay */}
+            {showAnnotator && mediaType === 'image' && mediaUrl && (
+              <div className="absolute inset-0 z-40 bg-black/95">
+                <UniversalAnnotator
+                  resourceId={resource.ref}
+                  resourceTitle={resource.field8 || ''}
+                  resourceType={mediaType}
+                  previewUrl={mediaUrl}
+                  onClose={() => setShowAnnotator(false)}
+                  onSave={(result) => {
+                    console.log('Annotation saved:', result);
+                    // Refresh alternative files
+                    loadAlternativeFiles();
+                  }}
+                  className="w-full h-full"
+                />
+              </div>
+            )}
+
             {/* Related Resources - Bottom Right */}
             {relatedResources.length > 0 && (
               <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur-sm rounded-lg p-2 max-w-xs">
@@ -1110,6 +1435,7 @@ const ResourceModalEnhanced = memo(({
         </div>
       </motion.div>
     </AnimatePresence>
+    </>
   )
 })
 
