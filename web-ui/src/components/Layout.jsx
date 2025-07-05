@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Upload, Folder, Star, User, Menu, X, LogOut, Settings, MoreVertical, Sun, Moon, LayoutDashboard } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { cn } from '../lib/utils'
 import HeaderSearchBar from './HeaderSearchBar'
 import useAuthStore from '../stores/useAuthStore'
@@ -18,7 +18,7 @@ const navigation = [
   { name: 'Featured', href: '/featured', icon: Star, faIcon: 'fa-star' },
 ]
 
-export default function Layout() {
+const Layout = memo(() => {
   const location = useLocation()
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -35,12 +35,12 @@ export default function Layout() {
   const userMenuRef = useRef(null)
   const adminMenuRef = useRef(null)
   
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout()
     navigate('/login')
-  }
+  }, [logout, navigate])
   
-  const handleThemeToggle = async () => {
+  const handleThemeToggle = useCallback(async () => {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark'
     setCurrentTheme(newTheme)
     
@@ -77,7 +77,7 @@ export default function Layout() {
         console.error('Failed to save theme preference:', error)
       }
     }
-  }
+  }, [currentTheme, settings, updateSettings, userMetadata])
   
   // Fetch settings on mount
   useEffect(() => {
@@ -411,4 +411,8 @@ export default function Layout() {
       />
     </div>
   )
-}
+})
+
+Layout.displayName = 'Layout'
+
+export default Layout

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { X, ChevronLeft, ChevronRight, Info, ZoomIn, ZoomOut, Maximize2, Share2, Edit2, Upload, MessageSquare, FileText, ChevronUp, ChevronDown, Check, XCircle, Save, Loader2, FolderPlus, FolderMinus, Expand } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '../lib/utils'
@@ -9,8 +9,9 @@ import useAuthStore from '../stores/useAuthStore'
 import VideoPlayerPro from './VideoPlayerPro'
 import ImageViewer from './ImageViewer'
 import axios from 'axios'
+import { debounce, throttle, rafThrottle } from '../lib/performance-utils'
 
-export default function ResourceModalEnhanced({ 
+const ResourceModalEnhanced = memo(({ 
   resource, 
   isOpen, 
   onClose, 
@@ -25,7 +26,7 @@ export default function ResourceModalEnhanced({
   onAddToCollection = null,
   onRemoveFromCollection = null,
   collectionBarHeight: propCollectionBarHeight = 52
-}) {
+}) => {
   const api = useApi()
   const navigate = useNavigate()
   const { sessionKey, user } = useAuthStore()
@@ -59,11 +60,22 @@ export default function ResourceModalEnhanced({
   const [availableSpace, setAvailableSpace] = useState({ width: 0, height: 0 })
   const [resourceData, setResourceData] = useState(null)
   
+  // Memoize organized metadata sections to avoid expensive recalculation
+  const organizedMetadataSections = useMemo(() => {
+    if (!metadata) return []
+    return organizeMetadataIntoSections(metadata)
+  }, [metadata])
+  
   const modalRef = useRef(null)
   const fileInputRef = useRef(null)
   const variantInputRef = useRef(null)
   const mediaContainerRef = useRef(null)
-  const mediaType = getMediaType(resourceData || resource)
+  
+  // Memoize mediaType to avoid recalculation on every render
+  const mediaType = useMemo(() => 
+    getMediaType(resourceData || resource), 
+    [resourceData, resource]
+  )
 
   // Load metadata collapsed state from localStorage
   useEffect(() => {
@@ -73,9 +85,9 @@ export default function ResourceModalEnhanced({
     }
   }, [])
 
-  // Calculate available space for media
-  useEffect(() => {
-    const calculateSpace = () => {
+  // Debounced calculate space function
+  const calculateSpace = useCallback(
+    debounce(() => {
       if (!mediaContainerRef.current) return
       
       const headerHeight = 45 // Ultra compact header
@@ -87,12 +99,16 @@ export default function ResourceModalEnhanced({
         width: window.innerWidth - metadataPanelWidth - padding,
         height: window.innerHeight - headerHeight - collectionBarActualHeight - padding
       })
-    }
+    }, 150),
+    [showMetadata, metadataWidth, activeCollection, isImageFullscreen, collectionBarHeight]
+  )
 
+  // Calculate available space for media
+  useEffect(() => {
     calculateSpace()
     window.addEventListener('resize', calculateSpace)
     return () => window.removeEventListener('resize', calculateSpace)
-  }, [showMetadata, metadataWidth, activeCollection, isImageFullscreen])
+  }, [calculateSpace])
 
   // Save metadata collapsed state to localStorage
   useEffect(() => {
@@ -409,7 +425,7 @@ export default function ResourceModalEnhanced({
   }
 
   // Navigate to related resource
-  const handleRelatedClick = async (relatedResource) => {
+  const handleRelatedClick = useCallback(async (relatedResource) => {
     // Load the new resource data
     setLoading(true)
     try {
@@ -424,10 +440,10 @@ export default function ResourceModalEnhanced({
     } catch (err) {
       console.error('Failed to switch to related resource:', err)
     }
-  }
+  }, [resource, loadResourceData])
 
   // Search by metadata value
-  const searchByMetadataValue = (field, value) => {
+  const searchByMetadataValue = useCallback((field, value) => {
     // Clean the value - remove extra whitespace
     const cleanValue = value.trim()
     
@@ -458,7 +474,7 @@ export default function ResourceModalEnhanced({
     // Navigate to browse page with search filter
     navigate(`/?search=${encodeURIComponent(searchQuery)}`)
     onClose()
-  }
+  }, [navigate, onClose])
 
   // Check if resource is in active collection
   const checkIfInCollection = async () => {
@@ -685,10 +701,10 @@ export default function ResourceModalEnhanced({
                     </div>
 
                     {/* Metadata Sections */}
-                    {metadata && organizeMetadataIntoSections(metadata).map((section, index) => (
+                    {organizedMetadataSections.map((section, index) => (
                       <div key={section.key} className={cn(
                         "pb-6",
-                        index !== organizeMetadataIntoSections(metadata).length - 1 && "border-b border-art-gray-800"
+                        index !== organizedMetadataSections.length - 1 && "border-b border-art-gray-800"
                       )}>
                         <h3 className="text-sm font-semibold text-art-gray-400 uppercase mb-4 tracking-wider">{section.title}</h3>
                         <div className={cn(
@@ -1095,7 +1111,7 @@ export default function ResourceModalEnhanced({
       </motion.div>
     </AnimatePresence>
   )
-}
+})
 
 // Helper function to organize metadata into sections
 function organizeMetadataIntoSections(metadata) {
@@ -1206,3 +1222,6 @@ function getVideoMimeType(extension) {
   }
   return mimeTypes[extension.toLowerCase()] || 'video/mp4'
 }
+
+// Export memoized component
+export default ResourceModalEnhanced

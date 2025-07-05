@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo, useCallback } from 'react'
 import { cn } from '../lib/utils'
 import { getResourcePreviewUrl } from '../lib/resourcespace-api-backend'
+import LazyImage from './LazyImage'
 
-export default function ResourceCard({ 
+const ResourceCard = memo(({ 
   resource, 
   viewMode = 'grid', 
   showUser = true, 
@@ -13,7 +14,7 @@ export default function ResourceCard({
   onSelect,
   selectedResources = new Set(),
   allResources = []
-}) {
+}) => {
   const [imageError, setImageError] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const longPressTimer = useRef(null)
@@ -47,15 +48,15 @@ export default function ResourceCard({
     }
   }
   
-  const handleCheckboxClick = (e) => {
+  const handleCheckboxClick = useCallback((e) => {
     e.stopPropagation()
     if (onSelect) {
       onSelect(e)
     }
-  }
+  }, [onSelect])
 
   // Drag and drop handlers
-  const handleDragStart = (e) => {
+  const handleDragStart = useCallback((e) => {
     setIsDragging(true)
     
     // If multiple resources are selected and this resource is one of them,
@@ -90,11 +91,11 @@ export default function ResourceCard({
     }
     
     e.dataTransfer.effectAllowed = 'copy'
-  }
+  }, [selected, selectedResources, allResources, resource])
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     setIsDragging(false)
-  }
+  }, [])
   
   // Cleanup on unmount
   useEffect(() => {
@@ -109,25 +110,19 @@ export default function ResourceCard({
   if (viewMode === 'list') {
     return (
       <div 
-        onClick={(e) => onClick && onClick(e)}
+        onClick={onClick}
         draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         className="flex items-center gap-4 p-4 card-theme rounded-lg bg-theme-hover transition-colors group cursor-pointer"
       >
         <div className="w-24 h-24 flex-shrink-0 bg-theme-tertiary rounded-lg overflow-hidden">
-          {!imageError ? (
-            <img
-              src={previewUrl}
-              alt={title}
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <i className="fas fa-image text-2xl text-theme-tertiary"></i>
-            </div>
-          )}
+          <LazyImage
+            src={previewUrl}
+            alt={title}
+            onError={() => setImageError(true)}
+            className="w-full h-full object-cover"
+          />
         </div>
         
         <div className="flex-1 min-w-0">
@@ -184,19 +179,12 @@ export default function ResourceCard({
         )}
       >
         <div className="relative bg-art-gray-900 rounded-lg overflow-hidden">
-          {!imageError ? (
-            <img
-              src={previewUrl}
-              alt={title}
-              onError={() => setImageError(true)}
-              className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full aspect-[4/3] flex items-center justify-center bg-art-gray-800">
-              <i className="fas fa-image text-3xl text-art-gray-600"></i>
-            </div>
-          )}
+          <LazyImage
+            src={previewUrl}
+            alt={title}
+            onError={() => setImageError(true)}
+            className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300 aspect-[4/3]"
+          />
           
           {/* Selection checkbox */}
           <div className={cn(
@@ -242,18 +230,12 @@ export default function ResourceCard({
           selected && "ring-2 ring-art-accent"
         )}
       >
-        {!imageError ? (
-          <img
-            src={previewUrl}
-            alt={title}
-            onError={() => setImageError(true)}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-theme-tertiary">
-            <i className="fas fa-image text-xl text-theme-tertiary"></i>
-          </div>
-        )}
+        <LazyImage
+          src={previewUrl}
+          alt={title}
+          onError={() => setImageError(true)}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+        />
         
         {/* Selection checkbox */}
         <div className={cn(
@@ -322,18 +304,12 @@ export default function ResourceCard({
       
       {/* Thumbnail */}
       <div className="relative aspect-[4/3] bg-theme-secondary overflow-hidden">
-        {!imageError ? (
-          <img
-            src={previewUrl}
-            alt={title}
-            onError={() => setImageError(true)}
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <i className="fas fa-image text-3xl text-art-gray-700"></i>
-          </div>
-        )}
+        <LazyImage
+          src={previewUrl}
+          alt={title}
+          onError={() => setImageError(true)}
+          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+        />
         
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -403,4 +379,17 @@ export default function ResourceCard({
       </div>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for better performance
+  return (
+    prevProps.resource.ref === nextProps.resource.ref &&
+    prevProps.viewMode === nextProps.viewMode &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.selectionMode === nextProps.selectionMode &&
+    prevProps.selectedResources === nextProps.selectedResources
+  )
+})
+
+ResourceCard.displayName = 'ResourceCard'
+
+export default ResourceCard

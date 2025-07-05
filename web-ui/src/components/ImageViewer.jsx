@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { throttle } from '../lib/performance-utils'
 
-export default function ImageViewer({ src, alt, isFullscreen, availableWidth, availableHeight }) {
+const ImageViewer = memo(({ src, alt, isFullscreen, availableWidth, availableHeight }) => {
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -23,78 +24,90 @@ export default function ImageViewer({ src, alt, isFullscreen, availableWidth, av
     setRotation(0)
   }, [src])
 
-  // Mouse wheel zoom
-  useEffect(() => {
-    const handleWheel = (e) => {
+  // Throttled wheel handler for smooth zooming
+  const handleWheel = useCallback(
+    throttle((e) => {
       if (!containerRef.current?.contains(e.target)) return
       
       e.preventDefault()
       const delta = e.deltaY > 0 ? -SCALE_STEP : SCALE_STEP
-      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale + delta))
       
-      if (newScale !== scale) {
-        // Calculate zoom point relative to image center
-        const rect = imageRef.current?.getBoundingClientRect()
-        if (rect) {
-          const x = e.clientX - rect.left - rect.width / 2
-          const y = e.clientY - rect.top - rect.height / 2
-          
-          // Adjust position to zoom towards cursor
-          const scaleDiff = newScale - scale
-          setPosition(prev => ({
-            x: prev.x - (x * scaleDiff) / scale,
-            y: prev.y - (y * scaleDiff) / scale
-          }))
+      setScale(prevScale => {
+        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, prevScale + delta))
+        
+        if (newScale !== prevScale) {
+          // Calculate zoom point relative to image center
+          const rect = imageRef.current?.getBoundingClientRect()
+          if (rect) {
+            const x = e.clientX - rect.left - rect.width / 2
+            const y = e.clientY - rect.top - rect.height / 2
+            
+            // Adjust position to zoom towards cursor
+            const scaleDiff = newScale - prevScale
+            setPosition(prev => ({
+              x: prev.x - (x * scaleDiff) / prevScale,
+              y: prev.y - (y * scaleDiff) / prevScale
+            }))
+          }
         }
         
-        setScale(newScale)
-      }
-    }
+        return newScale
+      })
+    }, 50),
+    []
+  )
 
-    window.addEventListener('wheel', handleWheel, { passive: false })
-    return () => window.removeEventListener('wheel', handleWheel)
-  }, [scale])
+  // Mouse wheel zoom
+  useEffect(() => {
+    const wheelHandler = (e) => handleWheel(e)
+    window.addEventListener('wheel', wheelHandler, { passive: false })
+    return () => window.removeEventListener('wheel', wheelHandler)
+  }, [handleWheel])
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = useCallback((e) => {
     if (scale <= 1) return
     setIsDragging(true)
     setDragStart({
       x: e.clientX - position.x,
       y: e.clientY - position.y
     })
-  }
+  }, [scale, position.x, position.y])
 
-  const handleMouseMove = (e) => {
-    if (!isDragging) return
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    })
-  }
+  // Throttled mouse move for smooth dragging
+  const handleMouseMove = useCallback(
+    throttle((e) => {
+      if (!isDragging) return
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      })
+    }, 16), // ~60fps
+    [isDragging, dragStart.x, dragStart.y]
+  )
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false)
-  }
+  }, [])
 
-  const handleZoomIn = () => {
+  const handleZoomIn = useCallback(() => {
     setScale(prev => Math.min(MAX_SCALE, prev + SCALE_STEP))
-  }
+  }, [])
 
-  const handleZoomOut = () => {
+  const handleZoomOut = useCallback(() => {
     setScale(prev => Math.max(MIN_SCALE, prev - SCALE_STEP))
-  }
+  }, [])
 
-  const handleRotate = () => {
+  const handleRotate = useCallback(() => {
     setRotation(prev => (prev + 90) % 360)
-  }
+  }, [])
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setScale(1)
     setPosition({ x: 0, y: 0 })
     setRotation(0)
-  }
+  }, [])
 
-  const handleDoubleClick = (e) => {
+  const handleDoubleClick = useCallback((e) => {
     if (scale === 1) {
       // Zoom in to 2x at click point
       const rect = imageRef.current?.getBoundingClientRect()
@@ -108,6 +121,17 @@ export default function ImageViewer({ src, alt, isFullscreen, availableWidth, av
       // Reset zoom
       handleReset()
     }
+  }, [scale, handleReset])
+
+  // Compute transform style
+  const transformStyle = {
+    transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
+    transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+    width: '100%',
+    height: '100%',
+    maxWidth: availableWidth ? `${availableWidth}px` : '100%',
+    maxHeight: availableHeight ? `${availableHeight}px` : '100%',
+    cursor: scale > 1 ? 'move' : 'pointer'
   }
 
   return (
@@ -167,19 +191,15 @@ export default function ImageViewer({ src, alt, isFullscreen, availableWidth, av
         src={src}
         alt={alt}
         className="select-none object-contain"
-        style={{
-          transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-          width: '100%',
-          height: '100%',
-          maxWidth: availableWidth ? `${availableWidth}px` : '100%',
-          maxHeight: availableHeight ? `${availableHeight}px` : '100%',
-          cursor: scale > 1 ? 'move' : 'pointer'
-        }}
+        style={transformStyle}
         draggable={false}
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
       />
     </div>
   )
-}
+})
+
+ImageViewer.displayName = 'ImageViewer'
+
+export default ImageViewer
