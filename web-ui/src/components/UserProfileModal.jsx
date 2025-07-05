@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Camera, Save } from 'lucide-react'
+import { X, Camera, Save, ExternalLink } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 export default function UserProfileModal({ isOpen, onClose, userMetadata, onProfileUpdate }) {
   const [bio, setBio] = useState(userMetadata?.bio || '')
   const [profilePicture, setProfilePicture] = useState(userMetadata?.profile_picture || '')
+  const [rsProfilePicture, setRsProfilePicture] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [useRsProfile, setUseRsProfile] = useState(true)
   const fileInputRef = useRef(null)
   
   useEffect(() => {
@@ -14,8 +16,30 @@ export default function UserProfileModal({ isOpen, onClose, userMetadata, onProf
       setBio(userMetadata.bio || '')
       setProfilePicture(userMetadata.profile_picture || '')
       setPreviewUrl(null)
+      
+      // Fetch ResourceSpace profile image
+      if (userMetadata.ref) {
+        fetchRsProfileImage()
+      }
     }
   }, [userMetadata])
+  
+  const fetchRsProfileImage = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}/api/user-profile/${userMetadata.ref}/rs-picture`
+      )
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.profileImageUrl) {
+          setRsProfilePicture(data.profileImageUrl)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch ResourceSpace profile image:', error)
+    }
+  }
   
   const handleFileSelect = (e) => {
     const file = e.target.files[0]
@@ -105,9 +129,9 @@ export default function UserProfileModal({ isOpen, onClose, userMetadata, onProf
           <div className="flex flex-col items-center">
             <div className="relative">
               <div className="h-24 w-24 rounded-full bg-art-gray-800 overflow-hidden">
-                {(previewUrl || profilePicture) ? (
+                {(previewUrl || rsProfilePicture || profilePicture) ? (
                   <img 
-                    src={previewUrl || `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}${profilePicture}`}
+                    src={previewUrl || rsProfilePicture || `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}${profilePicture}`}
                     alt="Profile"
                     className="h-full w-full object-cover"
                   />
@@ -120,6 +144,7 @@ export default function UserProfileModal({ isOpen, onClose, userMetadata, onProf
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute bottom-0 right-0 p-2 bg-art-accent rounded-full text-white hover:bg-art-accent-dark transition-colors"
+                title="Upload custom profile picture"
               >
                 <Camera className="h-4 w-4" />
               </button>
@@ -130,6 +155,25 @@ export default function UserProfileModal({ isOpen, onClose, userMetadata, onProf
                 onChange={handleFileSelect}
                 className="hidden"
               />
+            </div>
+            {/* ResourceSpace Profile Note */}
+            <div className="mt-3 text-center">
+              <p className="text-xs text-art-gray-400">
+                {rsProfilePicture ? (
+                  <>Using your ResourceSpace profile picture</>
+                ) : (
+                  <>To set a profile picture in ResourceSpace,</>
+                )}
+              </p>
+              <a 
+                href={`${import.meta.env.VITE_RS_API_URL?.replace('/api/', '')}/pages/user/user_profile_edit.php`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-art-accent hover:text-art-accent-light inline-flex items-center gap-1 mt-1"
+              >
+                {rsProfilePicture ? 'Change in ResourceSpace' : 'Go to ResourceSpace settings'}
+                <ExternalLink className="h-3 w-3" />
+              </a>
             </div>
           </div>
           

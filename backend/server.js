@@ -788,6 +788,41 @@ app.post('/api/user-profile/:ref/picture', profilePicUpload.single('picture'), a
   }
 });
 
+// Get ResourceSpace profile image
+app.get('/api/user-profile/:ref/rs-picture', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { sessionKey } = req.query;
+    
+    // The get_profile_image API takes a user_ref (numeric ID)
+    const imageParams = new URLSearchParams({
+      function: 'get_profile_image',
+      param1: ref  // This should be the user ref (numeric ID)
+    });
+    
+    const imageQuery = `user=${RS_USER}&${imageParams.toString()}`;
+    const imageSign = signRequest(imageQuery);
+    
+    console.log('Getting profile image for user ref:', ref);
+    console.log('Query:', imageQuery);
+    
+    const imageResponse = await axios.get(`${RS_API_URL}?${imageQuery}&sign=${imageSign}`);
+    
+    console.log('Profile image response:', imageResponse.data);
+    
+    // The response is a URL or empty string
+    const imageUrl = imageResponse.data;
+    
+    res.json({
+      success: true,
+      profileImageUrl: imageUrl || null
+    });
+  } catch (error) {
+    console.error('Error fetching ResourceSpace profile image:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch ResourceSpace profile image' });
+  }
+});
+
 // Dashboard Tiles API endpoints
 // Get all tiles for a user
 app.get('/api/dashboard/tiles/:userRef', async (req, res) => {

@@ -30,6 +30,7 @@ const Layout = memo(() => {
   const [userMetadata, setUserMetadata] = useState(null)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [currentTheme, setCurrentTheme] = useState('dark')
+  const [rsProfilePicture, setRsProfilePicture] = useState(null)
   const { user, logout } = useAuthStore()
   const { settings, fetchSettings, applyTheme, updateSettings } = useSettingsStore()
   const userMenuRef = useRef(null)
@@ -113,6 +114,23 @@ const Layout = memo(() => {
             const metadataData = await metadataResponse.json()
             if (metadataData.success) {
               setUserMetadata(metadataData.user)
+              
+              // Fetch ResourceSpace profile picture
+              if (metadataData.user.ref) {
+                try {
+                  const rsProfileResponse = await fetch(
+                    `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}/api/user-profile/${metadataData.user.ref}/rs-picture`
+                  )
+                  if (rsProfileResponse.ok) {
+                    const rsProfileData = await rsProfileResponse.json()
+                    if (rsProfileData.profileImageUrl) {
+                      setRsProfilePicture(rsProfileData.profileImageUrl)
+                    }
+                  }
+                } catch (error) {
+                  console.error('Failed to fetch ResourceSpace profile picture:', error)
+                }
+              }
               
               // Apply user's theme preference
               if (metadataData.user.theme_preference) {
@@ -251,14 +269,26 @@ const Layout = memo(() => {
               <div className="flex items-center gap-2">
                 <div className="relative" ref={userMenuRef}>
                   <button 
-                    className="flex items-center gap-2 rounded-full p-2 text-theme-secondary hover:text-theme-primary bg-theme-hover focus:outline-none focus:ring-2 focus:ring-art-accent focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200"
+                    className="flex items-center gap-2 rounded-full p-1 pr-1.5 text-theme-secondary hover:text-theme-primary bg-theme-hover focus:outline-none focus:ring-2 focus:ring-art-accent focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200"
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     aria-label="User menu"
                     aria-expanded={userMenuOpen}
                   >
-                    <User className="h-5 w-5" />
                     {userMetadata && (
-                      <span className="hidden md:inline text-sm">{userMetadata.fullname || user.username}</span>
+                      <span className="hidden md:inline text-sm pl-2">{userMetadata.fullname || user.username}</span>
+                    )}
+                    {rsProfilePicture || userMetadata?.profile_picture ? (
+                      <div className="h-8 w-8 rounded-full overflow-hidden bg-art-gray-800">
+                        <img 
+                          src={rsProfilePicture || `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3003'}${userMetadata.profile_picture}`}
+                          alt={userMetadata?.fullname || user.username}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-art-gray-800 flex items-center justify-center">
+                        <User className="h-5 w-5" />
+                      </div>
                     )}
                   </button>
                 
