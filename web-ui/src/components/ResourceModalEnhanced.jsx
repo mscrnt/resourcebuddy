@@ -7,7 +7,7 @@ import { useApi } from '../contexts/ApiContext'
 import { useCollectionBar } from '../contexts/CollectionBarContext'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../stores/useAuthStore'
-import VideoPlayerPro from './VideoPlayerPro'
+import VideoPlayerEnhanced from './VideoPlayerEnhanced'
 import ImageViewer from './ImageViewer'
 import UniversalAnnotator from './UniversalAnnotator'
 import axios from 'axios'
@@ -68,6 +68,7 @@ const ResourceModalEnhanced = memo(({
   const [hoveredAltFile, setHoveredAltFile] = useState(null)
   const [showResourceLog, setShowResourceLog] = useState(false)
   const [resourceLog, setResourceLog] = useState([])
+  const [capturedFrameData, setCapturedFrameData] = useState(null)
   
   // Memoize organized metadata sections to avoid expensive recalculation
   const organizedMetadataSections = useMemo(() => {
@@ -265,6 +266,39 @@ const ResourceModalEnhanced = memo(({
       setResourceLog([])
     }
   }
+
+  // Handle frame capture from video player
+  const handleFrameCapture = useCallback((frameData) => {
+    console.log('Frame capture received:', frameData);
+    
+    // For annotation workflow (Q key captures without metadata)
+    if (!frameData.hasMetadata) {
+      // Check if dataUrl is already provided
+      if (frameData.dataUrl) {
+        setCapturedFrameData(frameData)
+        setShowAnnotator(true)
+      } else {
+        // Convert blob to data URL if needed
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setCapturedFrameData({
+            ...frameData,
+            dataUrl: reader.result
+          })
+          setShowAnnotator(true)
+        }
+        reader.readAsDataURL(frameData.blob)
+      }
+    } else {
+      // Export with metadata (E key)
+      const url = URL.createObjectURL(frameData.blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${resource.field8 || 'resource'}_frame_${frameData.frame}_${Date.now()}.png`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }, [resource])
 
   const loadComments = async () => {
     // Comments feature disabled for now
@@ -1193,28 +1227,45 @@ const ResourceModalEnhanced = memo(({
                   <div className="media-container w-full h-full flex items-center justify-center">
                     {mediaType === 'video' ? (
                       <div className="w-full h-full flex items-center justify-center bg-black">
-                        <video
-                          controls
-                          autoPlay={false}
-                          preload="metadata"
-                          playsInline
-                          className="w-full h-full rounded-lg shadow-2xl"
-                          style={{ 
-                            objectFit: 'contain',
-                            backgroundColor: 'black',
-                            maxWidth: '100%',
-                            maxHeight: '100%'
-                          }}
+                        <VideoPlayerEnhanced
                           src={mediaUrl}
                           poster={resourceData?.thumb || null}
+                          title={resource.field8 || 'Video'}
+                          resource={resource}
+                          onFrameCapture={handleFrameCapture}
                           onError={(err) => {
                             console.error('Video error:', err)
                             setError('Failed to play video')
                           }}
-                        >
-                          <source src={mediaUrl} type={getVideoMimeType(resourceData?.file_extension || 'mp4')} />
-                          Your browser does not support the video tag.
-                        </video>
+                          className="w-full h-full"
+                          controls={true}
+                          showFrameInfo={true}
+                          annotations={(() => {
+                            // Extract annotations with frame/time data
+                            return alternativeFiles
+                              .filter(file => file.alt_type === 'annotation')
+                              .map(file => {
+                                // Try to extract frame data from name or description
+                                const frameMatch = file.name?.match(/frame[_\s]+(\d+)/i) || 
+                                                  file.description?.match(/Frame\s+(\d+)/);
+                                const timeMatch = file.description?.match(/(\d+(?:\.\d+)?)\s*s/);
+                                
+                                const altFileId = file.ref || file.alt_id || file.file_id || file.id;
+                                const annotation = {
+                                  id: altFileId,
+                                  name: file.name,
+                                  frame: frameMatch ? parseInt(frameMatch[1]) : null,
+                                  time: timeMatch ? parseFloat(timeMatch[1]) : null,
+                                  // Use the same URL pattern as the preview images in alternative files
+                                  thumbnailUrl: `${BACKEND_URL}/api/alternative/${altFileId}/preview?size=thm&resourceRef=${resource.ref}`
+                                };
+                                
+                                // If we have frame but no time, or time but no frame, we'll let the video player calculate
+                                return annotation;
+                              })
+                              .filter(ann => ann.frame !== null || ann.time !== null); // Only include annotations with timing data
+                          })()}
+                        />
                       </div>
                     ) : (
                       <ImageViewer
@@ -1386,18 +1437,24 @@ const ResourceModalEnhanced = memo(({
             )}
 
             {/* Annotation Overlay */}
-            {showAnnotator && mediaType === 'image' && mediaUrl && (
+            {showAnnotator && (mediaType === 'image' || (mediaType === 'video' && capturedFrameData)) && (
               <div className="absolute inset-0 z-40 bg-black/95">
                 <UniversalAnnotator
                   resourceId={resource.ref}
                   resourceTitle={resource.field8 || ''}
-                  resourceType={mediaType}
-                  previewUrl={mediaUrl}
-                  onClose={() => setShowAnnotator(false)}
+                  resourceType={mediaType === 'video' ? 'image' : mediaType}
+                  previewUrl={capturedFrameData?.dataUrl || mediaUrl}
+                  frameData={capturedFrameData}
+                  onClose={() => {
+                    setShowAnnotator(false)
+                    setCapturedFrameData(null)
+                  }}
                   onSave={(result) => {
                     console.log('Annotation saved:', result);
                     // Refresh alternative files
                     loadAlternativeFiles();
+                    setShowAnnotator(false);
+                    setCapturedFrameData(null);
                   }}
                   className="w-full h-full"
                 />

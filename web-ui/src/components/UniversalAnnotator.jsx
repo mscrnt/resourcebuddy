@@ -64,9 +64,16 @@ export default function UniversalAnnotator({
     if (showNameDialog && !annotationName) { // Only set if not already set
       const hash = generateHash();
       const baseName = resourceTitle || `Resource ${resourceId}`;
-      setAnnotationName(`${baseName} - Annotation ${hash}`);
+      let annotationTitle = `${baseName} - Annotation ${hash}`;
+      
+      // If this is a video frame, add frame info to the name
+      if (frameData && frameData.frame !== undefined) {
+        annotationTitle = `${baseName} - Frame ${frameData.frame} @ ${frameData.timestamp || frameData.time}s - ${hash}`;
+      }
+      
+      setAnnotationName(annotationTitle);
     }
-  }, [showNameDialog]);
+  }, [showNameDialog, resourceTitle, resourceId, frameData]);
 
   const initializeMarkerArea = useCallback(() => {
     if (!imageRef.current || markerAreaRef.current) return;
@@ -153,7 +160,17 @@ export default function UniversalAnnotator({
       const formData = new FormData();
       formData.append('resource', resourceId);
       formData.append('name', name);
-      formData.append('description', description || `Annotated by ${user?.username || 'User'} on ${new Date().toLocaleString()}`);
+      // Build description with frame data if available
+      let fullDescription = description || '';
+      if (frameData && frameData.frame !== undefined) {
+        const frameInfo = `Frame ${frameData.frame} @ ${frameData.timestamp || frameData.time}s (${frameData.frameRate}fps)`;
+        fullDescription = fullDescription 
+          ? `${fullDescription}\n\n${frameInfo}` 
+          : frameInfo;
+      }
+      fullDescription += `\n\nAnnotated by ${user?.username || 'User'} on ${new Date().toLocaleString()}`;
+      
+      formData.append('description', fullDescription);
       formData.append('file', jpegBlob, `${name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${resourceId}.jpg`);
       formData.append('alt_type', 'annotation');
 
@@ -198,8 +215,28 @@ export default function UniversalAnnotator({
 
   return (
     <div className={cn('relative', className)} ref={containerRef}>
+      {/* Frame info banner for video frames */}
+      {frameData && frameData.frame !== undefined && (
+        <div className="absolute top-0 left-0 right-0 bg-art-accent/20 border-b border-art-accent/50 px-4 py-2 z-50">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-4 text-art-accent-light">
+              <span className="font-medium">Video Frame Annotation</span>
+              <span>Frame: {frameData.frame}</span>
+              <span>Time: {frameData.timestamp || frameData.time}s</span>
+              <span>FPS: {frameData.frameRate}</span>
+            </div>
+            <div className="text-art-gray-400">
+              {frameData.originalWidth}x{frameData.originalHeight}
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Toolbar */}
-      <div className="absolute top-4 left-4 z-50 flex items-center gap-2 bg-black/80 backdrop-blur-sm rounded-lg p-2">
+      <div className={cn(
+        "absolute left-4 z-50 flex items-center gap-2 bg-black/80 backdrop-blur-sm rounded-lg p-2",
+        frameData && frameData.frame !== undefined ? "top-14" : "top-4"
+      )}>
         {/* Annotation Tools */}
         <div className="flex items-center gap-1 mr-2">
           <button

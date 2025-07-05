@@ -510,6 +510,11 @@ app.get('/api/resource/:ref/preview', async (req, res) => {
 
 // File streaming endpoint - for videos and original files
 app.get('/api/resource/:ref/file', async (req, res) => {
+  // Add CORS headers for video files to allow canvas capture
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.header('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
   try {
     const { ref } = req.params;
     const { size = '' } = req.query; // empty size means original file
@@ -1525,6 +1530,26 @@ app.post('/api/resource/:ref/upload', resourceUpload.single('file'), async (req,
       fs.unlinkSync(req.file.path);
     }
     res.status(500).json({ success: false, error: 'Failed to upload file' });
+  }
+});
+
+// Capture video frame
+app.post('/api/resource/:ref/capture-frame', async (req, res) => {
+  try {
+    const { ref } = req.params;
+    const { time, sessionKey } = req.body;
+    
+    // Get the video URL
+    const videoUrl = `${process.env.BACKEND_URL || 'http://localhost:3003'}/api/resource/${ref}/file`;
+    
+    // For now, return error as we need ffmpeg for proper frame extraction
+    res.status(501).json({ 
+      success: false, 
+      error: 'Server-side video frame capture not yet implemented. Please use browser developer tools to take a screenshot.' 
+    });
+  } catch (error) {
+    console.error('Error capturing frame:', error);
+    res.status(500).json({ success: false, error: 'Failed to capture frame' });
   }
 });
 
